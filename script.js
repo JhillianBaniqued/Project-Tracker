@@ -106,6 +106,17 @@
     maintenance:{label:'Maintenance', dot:'maintenance', emoji:'🔧'}
   };
 
+  // The task modal's category dropdown is built from categoryMeta directly
+  // (instead of a hardcoded, easily-drifting option list) so its emoji always
+  // matches the ones shown beside category names everywhere else in the app.
+  (function populateCategorySelect(){
+    const sel = document.getElementById('f-category');
+    if(!sel) return;
+    sel.innerHTML = Object.keys(categoryMeta).map(key=>
+      `<option value="${key}">${categoryMeta[key].emoji} ${categoryMeta[key].label}</option>`
+    ).join('');
+  })();
+
   // ---------- PROGRESS / STATUS HELPERS ----------
   const STATUS_LABELS = {todo:'To Do', inprogress:'In Progress', completed:'Completed'};
   function allTasks(p){
@@ -240,9 +251,9 @@
   // filter for the list below.
   const HOME_TABS = [
     {key:'all', label:'All', dot:null},
-    {key:'inprogress', label:'In Progress', dot:'var(--amber)'},
+    {key:'inprogress', label:'In Progress', dot:'var(--blue)'},
     {key:'completed', label:'Completed', dot:'var(--accent)'},
-    {key:'suspended', label:'Suspended', dot:'var(--red)'},
+    {key:'suspended', label:'Suspended', dot:'var(--amber)'},
     {key:'archive', label:'Archive', dot:null}
   ];
   let homeFilter = 'all';
@@ -291,7 +302,7 @@
       // real computed progress in the normal accent color.
       let barWidth = progress, barClass = 'bar-inprogress';
       if(p.status==='completed'){ barWidth = 100; barClass='bar-completed'; }
-      else if(p.status==='suspended'){ barWidth = 100; barClass='bar-suspended'; }
+      else if(p.status==='suspended'){ barClass='bar-suspended'; } // stays red, keeps its real progress width — not auto-filled
       return `
       <div class="project-card">
         <div class="project-top">
@@ -342,13 +353,28 @@
   }
 
   // ---------- RENDER: PROJECT DETAIL ----------
+  // Header status color follows the project's own status field — Suspended
+  // and Completed are never overridden by task-level detail like overdue
+  // tasks, so the badge always matches what's set in Edit Project.
+  function projectHeaderStatus(p){
+    if(p.status === 'completed') return {label:'Completed', cls:'status-text-completed'};
+    if(p.status === 'suspended') return {label:'Suspended', cls:'status-text-suspended'};
+    return {label:'In Progress', cls:'status-text-inprogress'};
+  }
+  function renderDetailHeader(p){
+    document.getElementById('detail-title').textContent = p.name;
+    document.getElementById('detail-details').textContent = p.details || '';
+    document.getElementById('detail-details').style.display = p.details ? 'block' : 'none';
+    const hs = projectHeaderStatus(p);
+    document.getElementById('detail-sub').innerHTML =
+      `Lead: ${p.lead} • <span class="status-text ${hs.cls}">${hs.label}</span>`;
+    document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
+    document.getElementById('detail-launch-value').textContent = p.launch || 'TBD';
+  }
   function openProject(id){
     currentProjectId = id;
     const p = projects.find(x=>x.id===id);
-    document.getElementById('detail-title').textContent = p.name;
-    document.getElementById('detail-sub').textContent = `Lead: ${p.lead} • ${p.statusLabel}`;
-    document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
-    document.getElementById('detail-launch-value').textContent = p.launch || 'TBD';
+    renderDetailHeader(p);
     document.getElementById('archived-banner').style.display = p.archived ? 'flex' : 'none';
     document.getElementById('add-task-btn').style.display = p.archived ? 'none' : 'inline-block';
     switchScreen('screen-detail');
@@ -378,7 +404,7 @@
   function renderTaskGroups(){
     const p = projects.find(x=>x.id===currentProjectId);
     syncAllProgress(p);
-    document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
+    renderDetailHeader(p);
     const readOnly = !!p.archived;
     const container = document.getElementById('task-groups');
     container.innerHTML = Object.keys(categoryMeta).map((cat, i)=>{
@@ -394,7 +420,7 @@
         const progress = t.progress || 0;
         const remarksLog = ensureRemarksLog(t);
         const remarksHtml = remarksLog.length
-          ? `<ul class="remarks-cell-list">${remarksLog.slice(-3).map(r=>`<li><span class="remarks-cell-ts">${fmtTimestamp(r.ts)}</span> ${(r.text||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
+          ? `<ul class="remarks-cell-list">${remarksLog.slice(-3).map(r=>`<li title="${fmtTimestamp(r.ts).replace(/"/g,'&quot;')}">${(r.text||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
           : '—';
         return `
         <tr data-task="${t.id}" data-cat="${cat}">
@@ -527,18 +553,24 @@
         acc += pct;
       });
       const gradient = stops.length ? `conic-gradient(${stops.join(', ')})` : '#e5e7eb';
+      const tooltipRows = [
+        ['todo','swatch-todo','To Do',counts.todo],
+        ['inprogress','swatch-inprogress','In Progress',counts.inprogress],
+        ['completed','swatch-completed','Completed',counts.completed],
+        ['overdue','swatch-overdue','Overdue',counts.overdue]
+      ].filter(([,,,n])=> n > 0)
+       .map(([key,swatch,label,n])=>
+        `<div class="pie-tooltip-row"><span class="legend-swatch ${swatch}"></span>${label}<span class="pie-tooltip-val">${n}</span></div>`
+       ).join('') || `<div class="pie-tooltip-row">No tasks yet</div>`;
       return `
         <div class="pie-card">
-          <div class="pie-ring pie-ring-hover" style="background:${gradient}">
-            <span class="pie-count">${total}</span>
-            <div class="pie-tooltip">
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-todo"></span>To Do<span class="pie-tooltip-val">${counts.todo}</span></div>
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-inprogress"></span>In Progress<span class="pie-tooltip-val">${counts.inprogress}</span></div>
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-completed"></span>Completed<span class="pie-tooltip-val">${counts.completed}</span></div>
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-overdue"></span>Overdue<span class="pie-tooltip-val">${counts.overdue}</span></div>
+          <span class="pie-label">${meta.emoji} ${meta.label}</span>
+          <div class="pie-card-ring-wrap">
+            <div class="pie-ring pie-ring-hover" style="background:${gradient}">
+              <span class="pie-count">${total}</span>
+              <div class="pie-tooltip">${tooltipRows}</div>
             </div>
           </div>
-          <span class="pie-label">${meta.emoji} ${meta.label}</span>
           </div>`;
     }).join('');
 
@@ -581,7 +613,7 @@
     // ONE continuous solid bar (a single grid item spanning multiple day
     // columns) instead of a colored cell per day, so there are no seams.
     const GANTT_COLS = 31;
-    const ganttTrackTemplate = `repeat(${GANTT_COLS}, 26px)`;
+    const ganttTrackTemplate = `repeat(${GANTT_COLS}, minmax(0, 1fr))`;
     const ganttHead = Array.from({length:GANTT_COLS}, (_,i)=>{
       const day = i+1;
       const disabled = day > daysInGanttMonth;
@@ -856,7 +888,7 @@
       const chips = dayTasks.slice(0,2).map(t=>{
         const overdue = isOverdue(t);
         const statusClass = t.status==='completed' ? 'chip-completed' : (t.status==='inprogress' ? 'chip-inprogress' : 'chip-todo');
-        return `<span class="cal-task-chip ${statusClass} ${overdue?'overdue-chip':''}" title="${t.name.replace(/"/g,'&quot;')}" data-open-task="${t.id}">${t.name}</span>`;
+        return `<span class="cal-task-chip ${statusClass} ${overdue?'overdue-chip':''}" title="${t.name.replace(/"/g,'&quot;')}" data-open-day="${dateStr}">${t.name}</span>`;
       }).join('');
       const more = dayTasks.length>2 ? `<span class="cal-more" data-open-day="${dateStr}">+${dayTasks.length-2} more</span>` : '';
       cells += `<div class="cal-cell ${isToday?'today':''}"><span class="cal-daynum">${day}</span>${chips}${more}</div>`;
@@ -864,12 +896,6 @@
 
     document.getElementById('cal-grid').innerHTML = cells;
 
-    document.querySelectorAll('#cal-grid [data-open-task]').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        const loc = findTaskLocation(p, el.dataset.openTask);
-        if(loc) openTaskModal({projectId:currentProjectId, category:loc.category, taskId:loc.task.id});
-      });
-    });
     document.querySelectorAll('#cal-grid [data-open-day]').forEach(el=>{
       el.addEventListener('click', ()=> openDayModal(el.dataset.openDay, byDate[el.dataset.openDay] || []));
     });
@@ -952,7 +978,7 @@
     const proj = target && target.projectId ? projects.find(x=>x.id===target.projectId) : null;
     const readOnly = !!(proj && proj.archived);
     document.getElementById('modal-title').textContent = readOnly ? 'View Task (archived — read-only)' : (isEdit ? 'Edit Task' : 'New Task');
-    document.getElementById('modal-edit-delete').style.display = (isEdit && !readOnly) ? 'flex' : 'none';
+    document.getElementById('delete-task-btn').style.display = (isEdit && !readOnly) ? 'flex' : 'none';
     document.getElementById('task-modal-overlay').querySelectorAll('input,select,textarea,button.add-line-btn').forEach(el=>{
       if(el.id !== 'modal-cancel-btn') el.disabled = readOnly;
     });
@@ -968,7 +994,9 @@
       document.getElementById('f-start').value = t.start || '';
       document.getElementById('f-deadline').value = t.deadline || '';
       document.getElementById('f-repeat').value = t.repeat || 'none';
-      document.getElementById('f-status').value = t.status || 'todo';
+      // The modal only offers In Progress / Completed now — a legacy "To Do"
+      // task opens as In Progress here; saving will carry that forward.
+      document.getElementById('f-status').value = t.status === 'completed' ? 'completed' : 'inprogress';
       document.getElementById('f-progress').value = t.progress || 0;
       document.getElementById('f-progress-val').textContent = t.progress || 0;
       subtaskDraft = (t.subtasks || []).slice();
@@ -981,14 +1009,23 @@
       document.getElementById('f-start').value = '';
       document.getElementById('f-deadline').value = '';
       document.getElementById('f-repeat').value = 'none';
-      document.getElementById('f-status').value = 'todo';
+      document.getElementById('f-status').value = 'inprogress';
       document.getElementById('f-progress').value = 0;
       document.getElementById('f-progress-val').textContent = 0;
       remarksDraft = [];
     }
+    updateStatusFieldColor();
     renderSubtasks();
     renderRemarksLog(readOnly);
     overlay.classList.add('active');
+  }
+
+  // Colors the Status field itself — blue while In Progress, green once
+  // Completed — so the two allowed states are readable at a glance.
+  function updateStatusFieldColor(){
+    const el = document.getElementById('f-status');
+    el.classList.toggle('status-select-inprogress', el.value === 'inprogress');
+    el.classList.toggle('status-select-completed', el.value === 'completed');
   }
 
   // Live title-case: capitalizes the first letter after the start of the
@@ -1000,19 +1037,31 @@
   function capitalizeWords(str){
     return str.replace(/(^|\s)([a-z])/g, (m, boundary, letter) => boundary + letter.toUpperCase());
   }
-  function wireLiveTitleCase(id){
+  // Names only: letters (incl. accented), spaces, hyphens and apostrophes.
+  // Strips digits/symbols outright, and strips any leading space/hyphen/
+  // apostrophe so a name can never start with a non-letter character.
+  function sanitizeName(str){
+    return str
+      .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ '-]/g, '')
+      .replace(/^[\s'-]+/, '');
+  }
+  function wireLiveTitleCase(id, { nameOnly } = {}){
     const el = document.getElementById(id);
     el.addEventListener('input', ()=>{
       const pos = el.selectionStart;
-      const capitalized = capitalizeWords(el.value);
-      if(capitalized !== el.value){
-        el.value = capitalized;
-        el.selectionStart = el.selectionEnd = pos;
+      const lenBefore = el.value.length;
+      let next = nameOnly ? sanitizeName(el.value) : el.value;
+      next = capitalizeWords(next);
+      if(next !== el.value){
+        const removed = lenBefore - next.length;
+        el.value = next;
+        const newPos = Math.max(0, pos - removed);
+        el.selectionStart = el.selectionEnd = newPos;
       }
     });
   }
   wireLiveTitleCase('f-name');
-  wireLiveTitleCase('f-assignee');
+  wireLiveTitleCase('f-assignee', { nameOnly: true });
 
   document.getElementById('f-progress').addEventListener('input', (e)=>{
     document.getElementById('f-progress-val').textContent = e.target.value;
@@ -1060,6 +1109,7 @@
     label.textContent = value;
     field.disabled = true;
     fill.style.width = value + '%';
+    updateStatusFieldColor();
   }
 
   function renderSubtasks(){
@@ -1268,10 +1318,7 @@
       const p = projects.find(x=>x.id===editingProjectId);
       Object.assign(p, payload);
       if(currentProjectId === editingProjectId){
-        document.getElementById('detail-title').textContent = p.name;
-        document.getElementById('detail-sub').textContent = `Lead: ${p.lead} • ${p.statusLabel}`;
-        document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
-        document.getElementById('detail-launch-value').textContent = p.launch || 'TBD';
+        renderDetailHeader(p);
       }
     } else {
       projects.push(Object.assign({
