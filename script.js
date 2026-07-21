@@ -7,28 +7,28 @@
         planning:[
           {id:'t1', name:'Recent task — define scope', assignee:'Jordan', priority:'high', completed:true, status:'completed', progress:100, deadline:'2026-07-15', remarks:'Approved by stakeholders'},
           {id:'t2', name:'Set milestones and timeline', assignee:'Mia', priority:'medium', completed:false, status:'inprogress', progress:60, deadline:'2026-07-25', remarks:''},
-          {id:'t3', name:'Confirm budget with stakeholders', assignee:'Jordan', priority:'low', completed:false, status:'todo', progress:0, deadline:'2026-08-02', remarks:''},
+          {id:'t3', name:'Confirm budget with stakeholders', assignee:'Jordan', priority:'low', completed:false, status:'inprogress', progress:0, deadline:'2026-08-02', remarks:''},
         ],
         design:[
           {id:'t4', name:'Wireframe key screens', assignee:'Ana', priority:'high', completed:false, status:'inprogress', progress:40, deadline:'2026-07-28', remarks:'Homepage + dashboard completed'},
-          {id:'t5', name:'Finalize color and type system', assignee:'Ana', priority:'medium', completed:false, status:'todo', progress:0, deadline:'2026-08-05', remarks:''},
+          {id:'t5', name:'Finalize color and type system', assignee:'Ana', priority:'medium', completed:false, status:'inprogress', progress:0, deadline:'2026-08-05', remarks:''},
         ],
         development:[
           {id:'t6', name:'Set up project repo', assignee:'Kevin', priority:'medium', completed:false, status:'completed', progress:100, deadline:'2026-07-18', remarks:''},
           {id:'t7', name:'Build core components', assignee:'Kevin', priority:'high', completed:false, status:'inprogress', progress:35, deadline:'2026-08-10', remarks:''},
-          {id:'t8', name:'Connect API endpoints', assignee:'Sam', priority:'medium', completed:false, status:'todo', progress:0, deadline:'2026-08-15', remarks:''},
-          {id:'t9', name:'QA pass', assignee:'Sam', priority:'low', completed:false, status:'todo', progress:0, deadline:'2026-07-08', remarks:''},
+          {id:'t8', name:'Connect API endpoints', assignee:'Sam', priority:'medium', completed:false, status:'inprogress', progress:0, deadline:'2026-08-15', remarks:''},
+          {id:'t9', name:'QA pass', assignee:'Sam', priority:'low', completed:false, status:'inprogress', progress:0, deadline:'2026-07-08', remarks:''},
         ],
         testing:[
           {id:'t12', name:'Write regression test suite', assignee:'Sam', priority:'high', completed:false, status:'inprogress', progress:45, deadline:'2026-07-22', remarks:''},
-          {id:'t13', name:'Cross-browser QA', assignee:'Mia', priority:'medium', completed:false, status:'todo', progress:0, deadline:'2026-07-10', remarks:''},
+          {id:'t13', name:'Cross-browser QA', assignee:'Mia', priority:'medium', completed:false, status:'inprogress', progress:0, deadline:'2026-07-10', remarks:''},
         ],
         deployment:[
           {id:'t14', name:'Set up CI/CD pipeline', assignee:'Kevin', priority:'high', completed:false, status:'completed', progress:100, deadline:'2026-07-05', remarks:''},
-          {id:'t15', name:'Staging environment cutover', assignee:'Kevin', priority:'medium', completed:false, status:'todo', progress:0, deadline:'2026-08-12', remarks:''},
+          {id:'t15', name:'Staging environment cutover', assignee:'Kevin', priority:'medium', completed:false, status:'inprogress', progress:0, deadline:'2026-08-12', remarks:''},
         ],
         maintenance:[
-          {id:'t16', name:'Monitor error logs post-launch', assignee:'Jordan', priority:'low', completed:false, status:'todo', progress:0, deadline:'2026-09-01', remarks:''},
+          {id:'t16', name:'Monitor error logs post-launch', assignee:'Jordan', priority:'low', completed:false, status:'inprogress', progress:0, deadline:'2026-09-01', remarks:''},
         ]
       },
       dashboard:{
@@ -69,7 +69,7 @@
         ],
         design:[],
         development:[
-          {id:'t11', name:'Spike on data model', assignee:'Kevin', priority:'medium', completed:false, status:'todo', progress:20, deadline:'2026-08-03', remarks:''},
+          {id:'t11', name:'Spike on data model', assignee:'Kevin', priority:'medium', completed:false, status:'inprogress', progress:20, deadline:'2026-08-03', remarks:''},
         ]
       },
       dashboard:{
@@ -106,8 +106,32 @@
     maintenance:{label:'Maintenance', dot:'maintenance', emoji:'🔧'}
   };
 
+  // The task modal's category dropdown is built from categoryMeta directly
+  // (instead of a hardcoded, easily-drifting option list) so its emoji always
+  // matches the ones shown beside category names everywhere else in the app.
+  (function populateCategorySelect(){
+    const sel = document.getElementById('f-category');
+    if(!sel) return;
+    sel.innerHTML = Object.keys(categoryMeta).map(key=>
+      `<option value="${key}">${categoryMeta[key].emoji} ${categoryMeta[key].label}</option>`
+    ).join('');
+  })();
+
+  // Outline trash-can icon used anywhere a delete action needs a trash
+  // glyph, in place of the old 🗑 emoji (renders consistently across
+  // platforms/fonts, and follows the button's own color via currentColor).
+  const TRASH_ICON = `<svg class="trash-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`;
+
   // ---------- PROGRESS / STATUS HELPERS ----------
   const STATUS_LABELS = {todo:'To Do', inprogress:'In Progress', completed:'Completed'};
+  // Shortens a multi-word name for the table's Assigned To column, e.g.
+  // "Mia Britty" -> "Mia B." — keeps the first name in full and reduces
+  // every following word to its initial. Single-word names pass through.
+  function toInitials(name){
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if(parts.length < 2) return parts[0] || '';
+    return parts[0] + ' ' + parts.slice(1).map(w => w.charAt(0).toUpperCase() + '.').join(' ');
+  }
   function allTasks(p){
     return Object.keys(categoryMeta).reduce((acc,cat)=>
       acc.concat((p.tasks[cat] || []).map(t=>{ t.category = cat; return t; })), []);
@@ -240,9 +264,9 @@
   // filter for the list below.
   const HOME_TABS = [
     {key:'all', label:'All', dot:null},
-    {key:'inprogress', label:'In Progress', dot:'var(--amber)'},
+    {key:'inprogress', label:'In Progress', dot:'var(--blue)'},
     {key:'completed', label:'Completed', dot:'var(--accent)'},
-    {key:'suspended', label:'Suspended', dot:'var(--red)'},
+    {key:'suspended', label:'Suspended', dot:'var(--amber)'},
     {key:'archive', label:'Archive', dot:null}
   ];
   let homeFilter = 'all';
@@ -291,7 +315,7 @@
       // real computed progress in the normal accent color.
       let barWidth = progress, barClass = 'bar-inprogress';
       if(p.status==='completed'){ barWidth = 100; barClass='bar-completed'; }
-      else if(p.status==='suspended'){ barWidth = 100; barClass='bar-suspended'; }
+      else if(p.status==='suspended'){ barClass='bar-suspended'; } // stays red, keeps its real progress width — not auto-filled
       return `
       <div class="project-card">
         <div class="project-top">
@@ -309,7 +333,7 @@
         <div class="progress-track"><div class="progress-fill ${barClass}" style="width:${barWidth}%"></div></div>
         <div class="project-meta">
           <span class="status-pill status-${p.status}">${p.statusLabel}</span>
-          <span class="launch-date">Launch date: ${p.launch}</span>
+          <span class="launch-date">Deployment date: <span class="launch-date-value">${p.launch}</span></span>
         </div>
       </div>
     `;}).join('') : `<div class="empty-note">${viewingArchived() ? 'No archived projects.' : 'No projects in this status.'}</div>`;
@@ -342,13 +366,28 @@
   }
 
   // ---------- RENDER: PROJECT DETAIL ----------
+  // Header status color follows the project's own status field — Suspended
+  // and Completed are never overridden by task-level detail like overdue
+  // tasks, so the badge always matches what's set in Edit Project.
+  function projectHeaderStatus(p){
+    if(p.status === 'completed') return {label:'Completed', cls:'status-text-completed'};
+    if(p.status === 'suspended') return {label:'Suspended', cls:'status-text-suspended'};
+    return {label:'In Progress', cls:'status-text-inprogress'};
+  }
+  function renderDetailHeader(p){
+    document.getElementById('detail-title').textContent = p.name;
+    document.getElementById('detail-details').textContent = p.details || '';
+    document.getElementById('detail-details').style.display = p.details ? 'block' : 'none';
+    const hs = projectHeaderStatus(p);
+    document.getElementById('detail-sub').innerHTML =
+      `Lead: ${p.lead} • <span class="status-text ${hs.cls}">${hs.label}</span>`;
+    document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
+    document.getElementById('detail-launch-value').textContent = p.launch || 'TBD';
+  }
   function openProject(id){
     currentProjectId = id;
     const p = projects.find(x=>x.id===id);
-    document.getElementById('detail-title').textContent = p.name;
-    document.getElementById('detail-sub').textContent = `Lead: ${p.lead} • ${p.statusLabel}`;
-    document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
-    document.getElementById('detail-launch-value').textContent = p.launch || 'TBD';
+    renderDetailHeader(p);
     document.getElementById('archived-banner').style.display = p.archived ? 'flex' : 'none';
     document.getElementById('add-task-btn').style.display = p.archived ? 'none' : 'inline-block';
     switchScreen('screen-detail');
@@ -378,7 +417,7 @@
   function renderTaskGroups(){
     const p = projects.find(x=>x.id===currentProjectId);
     syncAllProgress(p);
-    document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
+    renderDetailHeader(p);
     const readOnly = !!p.archived;
     const container = document.getElementById('task-groups');
     container.innerHTML = Object.keys(categoryMeta).map((cat, i)=>{
@@ -394,7 +433,7 @@
         const progress = t.progress || 0;
         const remarksLog = ensureRemarksLog(t);
         const remarksHtml = remarksLog.length
-          ? `<ul class="remarks-cell-list">${remarksLog.slice(-3).map(r=>`<li><span class="remarks-cell-ts">${fmtTimestamp(r.ts)}</span> ${(r.text||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
+          ? `<ul class="remarks-cell-list">${remarksLog.slice(-3).map(r=>`<li title="${fmtTimestamp(r.ts).replace(/"/g,'&quot;')}">${(r.text||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
           : '—';
         return `
         <tr data-task="${t.id}" data-cat="${cat}">
@@ -404,7 +443,7 @@
               <span>${t.name}</span>
             </div>
           </td>
-          <td class="assignee-cell" title="${(t.assignee||'Unassigned').replace(/"/g,'&quot;')}">${t.assignee || 'Unassigned'}</td>
+          <td class="assignee-cell" title="${(t.assignee||'Unassigned').replace(/"/g,'&quot;')}">${t.assignee ? toInitials(t.assignee) : 'Unassigned'}</td>
           <td class="priority-${t.priority}" style="text-transform:capitalize;font-weight:700;">${t.priority}</td>
           <td class="deadline-cell">${fmtDate(t.deadline)}</td>
           <td><span class="status-badge status-${status}">${STATUS_LABELS[status] || status}</span></td>
@@ -416,7 +455,7 @@
             </div>
           </td>
           <td class="row-actions">
-            ${readOnly ? '' : `<button class="delete-row-btn" data-delete-task="${t.id}" data-cat="${cat}" title="Delete task">🗑</button>`}
+            ${readOnly ? '' : `<button class="delete-row-btn" data-delete-task="${t.id}" data-cat="${cat}" title="Delete task">${TRASH_ICON}</button>`}
           </td>
         </tr>`;
       }).join('') : `<tr><td colspan="8"><div class="empty-note">No tasks${filter!=='all' ? ' with this status':''}</div></td></tr>`;
@@ -430,7 +469,6 @@
                 <option value="all" ${filter==='all'?'selected':''}>All statuses</option>
                 <option value="inprogress" ${filter==='inprogress'?'selected':''}>In Progress</option>
                 <option value="completed" ${filter==='completed'?'selected':''}>Completed</option>
-                <option value="todo" ${filter==='todo'?'selected':''}>To Do</option>
               </select>
               <div class="chevron">▾</div>
             </div>
@@ -509,17 +547,17 @@
     const tasks = allTasks(p);
 
     // pie cards — one donut per SDLC category, each partitioned into
-    // To Do / In Progress / Completed / Overdue slices for that category's
+    // In Progress / Completed / Overdue slices for that category's
     // tasks. Hover the ring for the exact breakdown instead of a bare number.
     const pieCards = Object.keys(categoryMeta).map(catKey=>{
       const meta = categoryMeta[catKey];
       const catTasks = p.tasks[catKey] || [];
-      const counts = {todo:0, inprogress:0, completed:0, overdue:0};
+      const counts = {inprogress:0, completed:0, overdue:0};
       catTasks.forEach(t=> counts[taskBucket(t)]++ );
       const total = catTasks.length;
       let acc = 0;
       const stops = [];
-      [['todo',counts.todo,'var(--blue)'], ['inprogress',counts.inprogress,'var(--amber)'],
+      [['inprogress',counts.inprogress,'var(--blue)'],
        ['completed',counts.completed,'var(--accent)'], ['overdue',counts.overdue,'#9e2c15']].forEach(([key,n,color])=>{
         if(!total || !n) return;
         const pct = (n/total)*100;
@@ -527,18 +565,23 @@
         acc += pct;
       });
       const gradient = stops.length ? `conic-gradient(${stops.join(', ')})` : '#e5e7eb';
+      const tooltipRows = [
+        ['inprogress','swatch-inprogress','In Progress',counts.inprogress],
+        ['completed','swatch-completed','Completed',counts.completed],
+        ['overdue','swatch-overdue','Overdue',counts.overdue]
+      ].filter(([,,,n])=> n > 0)
+       .map(([key,swatch,label,n])=>
+        `<div class="pie-tooltip-row"><span class="legend-swatch ${swatch}"></span>${label}<span class="pie-tooltip-val">${n}</span></div>`
+       ).join('') || `<div class="pie-tooltip-row">No tasks yet</div>`;
       return `
         <div class="pie-card">
-          <div class="pie-ring pie-ring-hover" style="background:${gradient}">
-            <span class="pie-count">${total}</span>
-            <div class="pie-tooltip">
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-todo"></span>To Do<span class="pie-tooltip-val">${counts.todo}</span></div>
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-inprogress"></span>In Progress<span class="pie-tooltip-val">${counts.inprogress}</span></div>
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-completed"></span>Completed<span class="pie-tooltip-val">${counts.completed}</span></div>
-              <div class="pie-tooltip-row"><span class="legend-swatch swatch-overdue"></span>Overdue<span class="pie-tooltip-val">${counts.overdue}</span></div>
+          <span class="pie-label">${meta.emoji} ${meta.label}</span>
+          <div class="pie-card-ring-wrap">
+            <div class="pie-ring pie-ring-hover" style="background:${gradient}">
+              <span class="pie-count">${total}</span>
+              <div class="pie-tooltip">${tooltipRows}</div>
             </div>
           </div>
-          <span class="pie-label">${meta.emoji} ${meta.label}</span>
           </div>`;
     }).join('');
 
@@ -546,7 +589,6 @@
       <div class="dash-block">
         <p class="dash-block-title">Task Status Breakdown — by Category</p>
         <div class="gantt-legend" style="margin-bottom:12px;">
-          <span><span class="legend-swatch swatch-todo"></span>To Do</span>
           <span><span class="legend-swatch swatch-inprogress"></span>In Progress</span>
           <span><span class="legend-swatch swatch-completed"></span>Completed</span>
           <span><span class="legend-swatch swatch-overdue"></span>Overdue</span>
@@ -581,7 +623,7 @@
     // ONE continuous solid bar (a single grid item spanning multiple day
     // columns) instead of a colored cell per day, so there are no seams.
     const GANTT_COLS = 31;
-    const ganttTrackTemplate = `repeat(${GANTT_COLS}, 26px)`;
+    const ganttTrackTemplate = `repeat(${GANTT_COLS}, minmax(0, 1fr))`;
     const ganttHead = Array.from({length:GANTT_COLS}, (_,i)=>{
       const day = i+1;
       const disabled = day > daysInGanttMonth;
@@ -591,7 +633,7 @@
     const ganttRows = ganttPageItems.length ? ganttPageItems.map(({t,stDate,dlDate})=>{
       const startDay = stDate < monthStart ? 1 : stDate.getDate();
       const endDay = dlDate > monthEnd ? daysInGanttMonth : dlDate.getDate();
-      const cls = isOverdue(t) ? 'swatch-overdue' : (t.status==='completed' ? 'swatch-completed' : (t.status==='inprogress' ? 'swatch-inprogress' : 'swatch-todo'));
+      const cls = isOverdue(t) ? 'swatch-overdue' : (t.status==='completed' ? 'swatch-completed' : 'swatch-inprogress');
       return `
         <div class="gantt-grid-row">
           <div class="gantt-grid-taskname" title="${t.name.replace(/"/g,'&quot;')}">${t.name}</div>
@@ -613,7 +655,6 @@
           </div>
         </div>
         <div class="gantt-legend">
-          <span><span class="legend-swatch swatch-todo"></span>To Do</span>
           <span><span class="legend-swatch swatch-inprogress"></span>In Progress</span>
           <span><span class="legend-swatch swatch-completed"></span>Completed</span>
           <span><span class="legend-swatch swatch-overdue"></span>Overdue</span>
@@ -633,7 +674,7 @@
         </div>
       </div>`;
 
-    // workload by employee — partitioned into To Do / In Progress / Overdue / Completed.
+    // workload by employee — partitioned into In Progress / Overdue / Completed.
     // Names are normalized (trimmed, single-spaced, first letter of each word
     // capitalized) before grouping, so "john", "John", and "john  smith" all
     // fold into one consistent row instead of duplicating the same person.
@@ -644,7 +685,7 @@
     const empMap = {};
     tasks.forEach(t=>{
       const name = normalizeAssignee(t.assignee);
-      if(!empMap[name]) empMap[name] = {todo:0, inprogress:0, overdue:0, completed:0, total:0};
+      if(!empMap[name]) empMap[name] = {inprogress:0, overdue:0, completed:0, total:0};
       empMap[name][taskBucket(t)]++;
       empMap[name].total++;
     });
@@ -654,7 +695,6 @@
       <div class="employee-row">
         <span class="employee-name">${e.name}</span>
         <div class="employee-track">
-          <div class="employee-seg swatch-todo" style="width:${(e.todo/maxTasks)*100}%" title="To Do: ${e.todo}"></div>
           <div class="employee-seg swatch-inprogress" style="width:${(e.inprogress/maxTasks)*100}%" title="In Progress: ${e.inprogress}"></div>
           <div class="employee-seg swatch-completed" style="width:${(e.completed/maxTasks)*100}%" title="Completed: ${e.completed}"></div>
           <div class="employee-seg swatch-overdue" style="width:${(e.overdue/maxTasks)*100}%" title="Overdue: ${e.overdue}"></div>
@@ -680,7 +720,6 @@
       <div class="dash-block">
         <p class="dash-block-title">Workload — by Employee</p>
         <div class="gantt-legend" style="margin-bottom:12px;">
-          <span><span class="legend-swatch swatch-todo"></span>To Do</span>
           <span><span class="legend-swatch swatch-inprogress"></span>In Progress</span>
           <span><span class="legend-swatch swatch-completed"></span>Completed</span>
           <span><span class="legend-swatch swatch-overdue"></span>Overdue</span>
@@ -856,7 +895,7 @@
       const chips = dayTasks.slice(0,2).map(t=>{
         const overdue = isOverdue(t);
         const statusClass = t.status==='completed' ? 'chip-completed' : (t.status==='inprogress' ? 'chip-inprogress' : 'chip-todo');
-        return `<span class="cal-task-chip ${statusClass} ${overdue?'overdue-chip':''}" title="${t.name.replace(/"/g,'&quot;')}" data-open-task="${t.id}">${t.name}</span>`;
+        return `<span class="cal-task-chip ${statusClass} ${overdue?'overdue-chip':''}" title="${t.name.replace(/"/g,'&quot;')}" data-open-day="${dateStr}">${t.name}</span>`;
       }).join('');
       const more = dayTasks.length>2 ? `<span class="cal-more" data-open-day="${dateStr}">+${dayTasks.length-2} more</span>` : '';
       cells += `<div class="cal-cell ${isToday?'today':''}"><span class="cal-daynum">${day}</span>${chips}${more}</div>`;
@@ -864,12 +903,6 @@
 
     document.getElementById('cal-grid').innerHTML = cells;
 
-    document.querySelectorAll('#cal-grid [data-open-task]').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        const loc = findTaskLocation(p, el.dataset.openTask);
-        if(loc) openTaskModal({projectId:currentProjectId, category:loc.category, taskId:loc.task.id});
-      });
-    });
     document.querySelectorAll('#cal-grid [data-open-day]').forEach(el=>{
       el.addEventListener('click', ()=> openDayModal(el.dataset.openDay, byDate[el.dataset.openDay] || []));
     });
@@ -952,7 +985,6 @@
     const proj = target && target.projectId ? projects.find(x=>x.id===target.projectId) : null;
     const readOnly = !!(proj && proj.archived);
     document.getElementById('modal-title').textContent = readOnly ? 'View Task (archived — read-only)' : (isEdit ? 'Edit Task' : 'New Task');
-    document.getElementById('modal-edit-delete').style.display = (isEdit && !readOnly) ? 'flex' : 'none';
     document.getElementById('task-modal-overlay').querySelectorAll('input,select,textarea,button.add-line-btn').forEach(el=>{
       if(el.id !== 'modal-cancel-btn') el.disabled = readOnly;
     });
@@ -968,7 +1000,9 @@
       document.getElementById('f-start').value = t.start || '';
       document.getElementById('f-deadline').value = t.deadline || '';
       document.getElementById('f-repeat').value = t.repeat || 'none';
-      document.getElementById('f-status').value = t.status || 'todo';
+      // The modal only offers In Progress / Completed now — a legacy "To Do"
+      // task opens as In Progress here; saving will carry that forward.
+      document.getElementById('f-status').value = t.status === 'completed' ? 'completed' : 'inprogress';
       document.getElementById('f-progress').value = t.progress || 0;
       document.getElementById('f-progress-val').textContent = t.progress || 0;
       subtaskDraft = (t.subtasks || []).slice();
@@ -981,14 +1015,23 @@
       document.getElementById('f-start').value = '';
       document.getElementById('f-deadline').value = '';
       document.getElementById('f-repeat').value = 'none';
-      document.getElementById('f-status').value = 'todo';
+      document.getElementById('f-status').value = 'inprogress';
       document.getElementById('f-progress').value = 0;
       document.getElementById('f-progress-val').textContent = 0;
       remarksDraft = [];
     }
+    updateStatusFieldColor();
     renderSubtasks();
     renderRemarksLog(readOnly);
     overlay.classList.add('active');
+  }
+
+  // Colors the Status field itself — blue while In Progress, green once
+  // Completed — so the two allowed states are readable at a glance.
+  function updateStatusFieldColor(){
+    const el = document.getElementById('f-status');
+    el.classList.toggle('status-select-inprogress', el.value === 'inprogress');
+    el.classList.toggle('status-select-completed', el.value === 'completed');
   }
 
   // Live title-case: capitalizes the first letter after the start of the
@@ -1000,19 +1043,32 @@
   function capitalizeWords(str){
     return str.replace(/(^|\s)([a-z])/g, (m, boundary, letter) => boundary + letter.toUpperCase());
   }
-  function wireLiveTitleCase(id){
+  // Names only: letters (incl. accented), digits, spaces, hyphens and
+  // apostrophes — so things like "Team 2" or "Anna-Marie" are allowed.
+  // Strips other symbols outright, and strips any leading space/hyphen/
+  // apostrophe so a name can never start with a non-letter/digit character.
+  function sanitizeName(str){
+    return str
+      .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9 '-]/g, '')
+      .replace(/^[\s'-]+/, '');
+  }
+  function wireLiveTitleCase(id, { nameOnly } = {}){
     const el = document.getElementById(id);
     el.addEventListener('input', ()=>{
       const pos = el.selectionStart;
-      const capitalized = capitalizeWords(el.value);
-      if(capitalized !== el.value){
-        el.value = capitalized;
-        el.selectionStart = el.selectionEnd = pos;
+      const lenBefore = el.value.length;
+      let next = nameOnly ? sanitizeName(el.value) : el.value;
+      next = capitalizeWords(next);
+      if(next !== el.value){
+        const removed = lenBefore - next.length;
+        el.value = next;
+        const newPos = Math.max(0, pos - removed);
+        el.selectionStart = el.selectionEnd = newPos;
       }
     });
   }
   wireLiveTitleCase('f-name');
-  wireLiveTitleCase('f-assignee');
+  wireLiveTitleCase('f-assignee', { nameOnly: true });
 
   document.getElementById('f-progress').addEventListener('input', (e)=>{
     document.getElementById('f-progress-val').textContent = e.target.value;
@@ -1060,6 +1116,7 @@
     label.textContent = value;
     field.disabled = true;
     fill.style.width = value + '%';
+    updateStatusFieldColor();
   }
 
   function renderSubtasks(){
@@ -1085,8 +1142,12 @@
     });
     list.querySelectorAll('.remove-x').forEach(x=>{
       x.addEventListener('click', ()=>{
-        subtaskDraft.splice(x.dataset.idx,1);
-        renderSubtasks();
+        const idx = x.dataset.idx;
+        const sub = subtaskDraft[idx];
+        confirmAction(`Delete subtask "${sub && sub.name ? sub.name : 'this subtask'}"?`, ()=>{
+          subtaskDraft.splice(idx,1);
+          renderSubtasks();
+        });
       });
     });
     syncProgressFromSubtasks();
@@ -1107,8 +1168,10 @@
     list.querySelectorAll('.remarks-log-delete').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const idx = parseInt(btn.dataset.remarkIdx, 10);
-        remarksDraft.splice(idx, 1);
-        renderRemarksLog(readOnly);
+        confirmAction('Delete this remark? This cannot be undone.', ()=>{
+          remarksDraft.splice(idx, 1);
+          renderRemarksLog(readOnly);
+        });
       });
     });
   }
@@ -1193,21 +1256,6 @@
     renderCalendar();
   });
 
-  document.getElementById('delete-task-btn').addEventListener('click', ()=>{
-    if(!editingTask || !editingTask.taskId) return;
-    const p = projects.find(x=>x.id===currentProjectId);
-    const arr = p.tasks[editingTask.category];
-    const idx = arr.findIndex(t=>t.id===editingTask.taskId);
-    const task = idx>-1 ? arr[idx] : null;
-    confirmAction(`Delete task "${task ? task.name : ''}"? This cannot be undone.`, ()=>{
-      if(idx>-1) arr.splice(idx,1);
-      closeTaskModal();
-      renderTaskGroups();
-      renderDashboard();
-      renderCalendar();
-    });
-  });
-
   // ---------- PROJECT MODAL ----------
   const PROJECT_STATUS_LABELS = {inprogress:'In Progress', suspended:'Suspended', completed:'Completed'};
   const projectOverlay = document.getElementById('project-modal-overlay');
@@ -1268,10 +1316,7 @@
       const p = projects.find(x=>x.id===editingProjectId);
       Object.assign(p, payload);
       if(currentProjectId === editingProjectId){
-        document.getElementById('detail-title').textContent = p.name;
-        document.getElementById('detail-sub').textContent = `Lead: ${p.lead} • ${p.statusLabel}`;
-        document.getElementById('detail-rate-value').textContent = `${computeProjectProgress(p)}%`;
-        document.getElementById('detail-launch-value').textContent = p.launch || 'TBD';
+        renderDetailHeader(p);
       }
     } else {
       projects.push(Object.assign({
