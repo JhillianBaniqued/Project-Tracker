@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===================== HOME SCREEN ===================== -->
+  <div class="screen active" id="screen-home">
+    <header>
+      <div>
+        <h1>Project Tracker</h1>
+        <p class="subtitle">All active builds, in one place</p>
+      </div>
+      <button class="settings-btn">⚙ Settings</button>
+    </header>
+
+    <div class="action-row">
+      <button class="btn btn-primary" id="add-project-btn">+ Add Project</button>
+    </div>
+
+    <div class="home-tabs" id="home-tabs"></div>
+
+    <div id="project-card-list"></div>
+  </div>
+
+  <!-- ===================== PROJECT DETAIL SCREEN ===================== -->
+  <div class="screen" id="screen-detail">
+    <button class="btn-ghost" id="back-to-home">← Back to projects</button>
+
+    <div class="archived-banner" id="archived-banner" style="display:none;">
+      🗄 This project is archived — read-only. <button class="link-btn" id="restore-from-detail-btn">↩ Restore</button>
+    </div>
+
+    <div class="detail-header">
+      <div class="detail-header-left">
+        <div class="detail-title" id="detail-title">Project Name</div>
+        <p class="detail-sub" id="detail-sub">Lead • Status</p>
+      </div>
+      <div class="detail-header-right">
+        <div class="detail-rate">
+          <span class="detail-rate-value" id="detail-rate-value">0%</span>
+          <span class="detail-meta-label">Overall Progress</span>
+        </div>
+        <div class="detail-launch">
+          <span class="detail-launch-value" id="detail-launch-value">—</span>
+          <span class="detail-meta-label">Launch date</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab active" data-tab="task">Task</div>
+      <div class="tab" data-tab="dashboard">Dashboard</div>
+      <div class="tab" data-tab="calendar">Calendar</div>
+    </div>
+
+    <!-- TASK PANEL -->
+    <div class="panel active" id="panel-task">
+      <div class="task-panel-head">
+        <button class="btn btn-primary" id="add-task-btn">+ Add Task</button>
+      </div>
+      <div id="task-groups"></div>
+    </div>
+
+    <!-- DASHBOARD PANEL -->
+    <div class="panel" id="panel-dashboard">
+      <div id="dashboard-content"></div>
+    </div>
+
+    <!-- CALENDAR PANEL -->
+    <div class="panel" id="panel-calendar">
+      <div class="dash-block">
+        <div class="cal-nav">
+          <button class="cal-nav-btn" id="cal-prev">‹</button>
+          <span class="cal-month-label" id="cal-month-label"></span>
+          <button class="cal-nav-btn" id="cal-next">›</button>
+        </div>
+        <div class="cal-legend">
+          <span><span class="legend-swatch swatch-todo"></span>To Do</span>
+          <span><span class="legend-swatch swatch-inprogress"></span>In Progress</span>
+          <span><span class="legend-swatch swatch-completed"></span>Completed</span>
+          <span><span class="legend-swatch swatch-overdue"></span>Overdue</span>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== TASK MODAL ===================== -->
+<div class="modal-overlay" id="task-modal-overlay">
+  <div class="modal">
+    <div class="modal-top">
+      <h3 class="modal-top-title" id="modal-title">New Task</h3>
+      <div class="modal-top-actions" id="modal-edit-delete" style="display:none;">
+        <button class="link-btn danger" id="delete-task-btn">🗑 Delete</button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <div class="field">
+        <label>Task Name<span class="req">*</span></label>
+        <input type="text" id="f-name" placeholder="e.g. Draft wireframes">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Priority<span class="req">*</span></label>
+          <select id="f-priority">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Category<span class="req">*</span></label>
+          <select id="f-category">
+            <option value="planning">📋 Planning</option>
+            <option value="design">🎨 Design</option>
+            <option value="development">💻 Development</option>
+            <option value="testing">🧪 Testing</option>
+            <option value="deployment">🚀 Deployment</option>
+            <option value="maintenance">🔧 Maintenance</option>
+          </select>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="field">
+        <label>Assigned To</label>
+        <input type="text" id="f-assignee" placeholder="Name">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Start Date</label>
+          <input type="date" id="f-start">
+        </div>
+        <div class="field">
+          <label>Deadline</label>
+          <input type="date" id="f-deadline">
+        </div>
+        <div class="field">
+          <label>Repeat</label>
+          <select id="f-repeat">
+            <option value="none" selected>None</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="todo" selected>To Do</option>
+            <option value="inprogress">In Progress</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Progress (<span id="f-progress-val">0</span>%) <span id="f-progress-note" style="font-weight:600;color:var(--muted);text-transform:none;font-size:11px;"></span></label>
+          <input type="range" id="f-progress" min="0" max="100" step="5" value="0">
+          <div class="progress-track" style="margin-top:8px;"><div class="progress-fill" id="f-progress-bar-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="subtask-block">
+        <div class="subtask-header">+ Subtasks</div>
+        <div class="subtask-body">
+          <div id="subtask-list"></div>
+          <div class="empty-note" id="subtask-empty">No subtask</div>
+          <button class="add-line-btn" id="add-subtask-btn">+ Add Subtask</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Remarks</label>
+        <ul class="remarks-log" id="remarks-log"></ul>
+        <div class="empty-note" id="remarks-empty">No remarks yet</div>
+        <div class="remarks-add-row">
+          <input type="text" id="f-remarks-new" placeholder="Add a remark...">
+          <button class="btn btn-outline" id="add-remark-btn" type="button">+ Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="modal-cancel-btn">Cancel</button>
+      <button class="btn btn-submit" id="modal-submit-btn">Submit</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="project-modal-overlay">
+  <div class="modal">
+    <div class="modal-top">
+      <h3 class="modal-top-title" id="pm-title">New Project</h3>
+      <div class="modal-top-actions" id="pm-edit-actions" style="display:none;">
+        <button class="link-btn" id="pm-archive-btn">🗄 Archive</button>
+        <button class="link-btn danger" id="pm-delete-btn">🗑 Delete</button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <div class="field">
+        <label>Project Name<span class="req">*</span></label>
+        <input type="text" id="pm-name" placeholder="e.g. Website Redesign">
+      </div>
+
+      <div class="field">
+        <label>Details</label>
+        <textarea id="pm-details" placeholder="Short description of the project"></textarea>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Lead</label>
+          <input type="text" id="pm-lead" placeholder="Name">
+        </div>
+        <div class="field">
+          <label>Launch Date</label>
+          <input type="date" id="pm-launch">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Status</label>
+        <select id="pm-status">
+          <option value="inprogress" selected>In Progress</option>
+          <option value="suspended">Suspended</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="pm-cancel-btn">Cancel</button>
+      <button class="btn btn-submit" id="pm-submit-btn">Submit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== GENERIC CONFIRM MODAL ===================== -->
+<div class="modal-overlay" id="confirm-modal-overlay">
+  <div class="modal confirm-modal">
+    <div class="modal-body" style="padding:24px;">
+      <p class="confirm-message" id="confirm-message">Are you sure?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="confirm-cancel-btn">Cancel</button>
+      <button class="btn btn-submit confirm-danger" id="confirm-ok-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CALENDAR DAY-DETAIL MODAL ===================== -->
+<div class="modal-overlay" id="day-modal-overlay">
+  <div class="modal">
+    <div class="modal-top">
+      <h3 class="modal-top-title" id="day-modal-title">Tasks</h3>
+    </div>
+    <div class="modal-body" id="day-modal-body" style="padding-bottom:20px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="day-modal-close-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
