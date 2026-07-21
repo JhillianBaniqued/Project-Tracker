@@ -12,6 +12,10 @@
     --muted:#6b7280;
     --blue:#3b6ea5;
     --blue-soft:#e7eff7;
+    --orange:#c96a1f;
+    --orange-soft:#faead9;
+    --slate:#5b6b7d;
+    --slate-soft:#e9edf1;
     --radius:14px;
     font-family: 'Segoe UI', system-ui, sans-serif;
   }
@@ -21,6 +25,8 @@
     background:var(--paper);
     color:var(--ink);
     padding:32px 20px 80px;
+    /* Reminder: whole app scaled up ~125% for readability */
+    zoom:1.25;
   }
   .wrap{max-width:920px;margin:0 auto;}
   .screen{display:none;}
@@ -43,6 +49,7 @@
     display:inline-block;
   }
   .subtitle{color:var(--muted);font-size:14px;margin:0;}
+  .settings-wrap{position:relative;}
   .settings-btn{
     display:flex;align-items:center;gap:6px;
     background:var(--card);
@@ -55,6 +62,32 @@
     box-shadow:0 1px 2px rgba(0,0,0,0.04);
   }
   .settings-btn:hover{background:var(--accent-soft);}
+  .settings-btn:disabled{cursor:not-allowed;opacity:0.55;}
+  .settings-btn:disabled:hover{background:var(--card);}
+  .settings-menu{
+    display:none;
+    position:absolute;right:0;top:calc(100% + 6px);
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.14);
+    z-index:30;
+    min-width:190px;
+    overflow:hidden;
+  }
+  .settings-menu.open{display:block;}
+  .settings-menu button{
+    display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+    padding:11px 14px;
+    background:none;border:none;
+    font-size:13px;font-weight:600;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .settings-menu button:hover{background:var(--paper);}
+  .settings-menu button.danger{color:var(--red);}
+  .settings-menu button.danger:hover{background:var(--red-soft);}
+  .settings-menu-divider{height:1px;background:var(--line);margin:4px 0;}
 
   /* ACTION ROW */
   .action-row{
@@ -143,10 +176,12 @@
     border-radius:999px;
   }
   .status-pill.status-inprogress{background:var(--blue-soft);color:var(--blue);}
-  .status-pill.status-suspended{background:var(--red-soft);color:var(--red);}
+  .status-pill.status-suspended{background:var(--orange-soft);color:var(--orange);}
+  .status-pill.status-overdue{background:var(--red-soft);color:var(--red);}
   .status-pill.status-completed{background:var(--accent-soft);color:var(--accent);}
 
   .launch-date{font-size:12.5px;color:var(--muted);}
+  .launch-date-value{color:var(--ink);font-weight:700;}
 
   .progress-track{
     height:6px;
@@ -171,7 +206,12 @@
     font-weight:800;
     margin:8px 0 2px;
   }
+  .detail-details{color:var(--ink);font-size:13.5px;margin:0 0 8px;max-width:520px;line-height:1.5;}
   .detail-sub{color:var(--muted);font-size:14px;margin:0 0 18px;}
+  .status-text{font-weight:700;}
+  .status-text-inprogress{color:var(--blue);}
+  .status-text-completed{color:var(--accent);}
+  .status-text-suspended{color:var(--orange);}
   .detail-header-right{display:flex;gap:24px;align-items:center;margin-top:10px;}
   .detail-rate,.detail-launch{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
   .detail-rate-value{font-size:22px;font-weight:800;color:var(--accent);}
@@ -183,7 +223,7 @@
     display:flex;
     gap:4px;
     border-bottom:2px solid var(--ink);
-    margin:10px 0 18px;
+    margin:18px 0;
   }
   .tab{
     padding:10px 20px;
@@ -326,7 +366,18 @@
 
   /* TASK TABLE */
   .task-table-wrap{overflow-x:auto;}
-  .task-table{width:100%;border-collapse:collapse;min-width:680px;}
+  .task-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:680px;}
+  /* fixed column widths (same set on every category table) so all the
+     per-category tables line up with one another instead of each auto-sizing
+     to its own content */
+  .task-table th:nth-child(1), .task-table td:nth-child(1){width:27%;}
+  .task-table th:nth-child(2), .task-table td:nth-child(2){width:13%;}
+  .task-table th:nth-child(3), .task-table td:nth-child(3){width:8%;}
+  .task-table th:nth-child(4), .task-table td:nth-child(4){width:10%;}
+  .task-table th:nth-child(5), .task-table td:nth-child(5){width:10%;}
+  .task-table th:nth-child(6), .task-table td:nth-child(6){width:14%;}
+  .task-table th:nth-child(7), .task-table td:nth-child(7){width:13%;}
+  .task-table th:nth-child(8), .task-table td:nth-child(8){width:5%;}
   .task-table th{
     text-align:left;
     font-size:10.5px;
@@ -336,24 +387,29 @@
     color:var(--muted);
     padding:0 12px 8px;
     border-bottom:1px solid var(--line);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   .task-table td{
     padding:12px 12px;
     font-size:13.5px;
     border-bottom:1px solid #eceef1;
     vertical-align:middle;
+    overflow:hidden;
   }
+  .task-table td:first-child, .task-table td:nth-child(2){overflow:visible;vertical-align:top;}
   .task-table tbody tr{cursor:pointer;}
   .task-table tbody tr:hover{background:var(--paper);}
   .task-table tbody tr:last-child td{border-bottom:none;}
-  .task-name-cell{display:flex;align-items:center;gap:8px;font-weight:600;}
+  .task-name-cell{font-weight:600;}
+  .task-name-cell .task-priority{display:inline-block;vertical-align:middle;margin-right:8px;margin-bottom:2px;}
+  .task-name-cell span:last-child{display:inline;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.4;}
   .status-badge{
     font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;
     text-transform:capitalize;white-space:nowrap;
   }
-  .status-badge.status-inprogress{background:var(--amber-soft);color:var(--amber);}
+  .status-badge.status-inprogress{background:var(--blue-soft);color:var(--blue);}
   .status-badge.status-completed{background:var(--accent-soft);color:var(--accent);}
-  .status-badge.status-todo{background:var(--blue-soft);color:var(--blue);}
+  .status-badge.status-todo{background:var(--slate-soft);color:var(--slate);}
   .remarks-cell{
     max-width:140px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -502,13 +558,20 @@
   }
 
   .modal-footer{
-    display:flex;justify-content:flex-end;gap:10px;
+    display:flex;justify-content:flex-end;align-items:center;gap:10px;
     padding:18px 24px 24px;
   }
+  .modal-footer-right{display:flex;gap:10px;margin-left:auto;}
   .btn-cancel{background:transparent;border:1px solid var(--line);color:var(--muted);}
   .btn-cancel:hover{background:var(--paper);}
   .btn-submit{background:var(--accent);color:#fff;}
   .btn-submit:hover{background:#2f5a44;}
+  .btn-delete{background:transparent;border:1px solid var(--red);color:var(--red);}
+  .btn-delete:hover{background:var(--red-soft);}
+
+  /* task modal status field: colored to match the two allowed states */
+  #f-status.status-select-inprogress{color:var(--blue);border-color:var(--blue);font-weight:700;}
+  #f-status.status-select-completed{color:var(--accent);border-color:var(--accent);font-weight:700;}
 
   /* ===================== DASHBOARD ===================== */
   .dash-block{
@@ -539,13 +602,14 @@
     min-width:110px;
     display:flex;
     flex-direction:column;
-    align-items:center;
+    align-items:flex-start;
     gap:10px;
     padding:14px 10px;
     border:1px solid var(--line);
     border-radius:12px;
     background:var(--paper);
   }
+  .pie-card-ring-wrap{width:100%;display:flex;justify-content:center;}
   .pie-ring{
     width:76px;height:76px;
     border-radius:50%;
@@ -565,7 +629,7 @@
     font-size:16px;
     font-weight:800;
   }
-  .pie-label{font-size:12px;font-weight:700;text-align:center;}
+  .pie-label{font-size:12px;font-weight:700;text-align:left;}
   .pie-sublabel{font-size:10.5px;font-weight:600;color:var(--muted);text-align:center;}
 
   .gantt-legend{
@@ -576,28 +640,30 @@
   }
   .legend-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
   .swatch-completed{background:var(--accent);}
-  .swatch-inprogress{background:var(--amber);}
-  .swatch-todo{background:var(--blue);}
+  .swatch-inprogress{background:var(--blue);}
+  .swatch-todo{background:var(--slate);}
   .swatch-overdue{background:#9e2c15;}
 
-  .gantt-wrap{overflow-x:auto;}
+  .gantt-wrap{overflow-x:hidden;width:100%;}
 
   /* fixed 31-column gantt grid: header + one row per task, each task bar is
-     a single continuous grid item (no per-day seams) */
-  .gantt-grid-head-row,.gantt-grid-row{display:flex;align-items:center;gap:0;}
+     a single continuous grid item (no per-day seams). Columns are fluid
+     (fr-based) so the whole grid always fits the container width — never
+     scrolls, just gets narrower/more cramped on smaller screens. */
+  .gantt-grid-head-row,.gantt-grid-row{display:flex;align-items:center;gap:0;width:100%;}
   .gantt-grid-head-row{padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:8px;}
-  .gantt-grid-rows{display:flex;flex-direction:column;gap:14px;min-width:986px;}
+  .gantt-grid-rows{display:flex;flex-direction:column;gap:14px;width:100%;}
   .gantt-grid-taskname{
-    width:170px;flex-shrink:0;font-size:12px;font-weight:600;line-height:1.3;
-    white-space:normal;word-break:break-word;padding-right:10px;
+    width:130px;flex-shrink:0;font-size:12px;font-weight:600;line-height:1.3;
+    white-space:normal;word-break:break-word;padding-right:8px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   }
-  .gantt-grid-track-head{display:grid;min-width:806px;}
-  .gantt-grid-head-cell{font-size:10px;color:var(--muted);font-weight:700;text-align:center;}
+  .gantt-grid-track-head{display:grid;flex:1;min-width:0;}
+  .gantt-grid-head-cell{font-size:9px;color:var(--muted);font-weight:700;text-align:center;overflow:hidden;}
   .gantt-grid-head-cell.disabled{color:transparent;}
   .gantt-grid-track{
-    display:grid;position:relative;height:22px;min-width:806px;
-    background-image:repeating-linear-gradient(to right, #eceef1 0, #eceef1 1px, transparent 1px, transparent 26px);
+    display:grid;position:relative;height:22px;flex:1;min-width:0;
+    background-image:repeating-linear-gradient(to right, #eceef1 0, #eceef1 1px, transparent 1px, transparent calc(100%/31));
   }
   .gantt-grid-bar{
     grid-row:1;align-self:center;height:14px;border-radius:7px;
@@ -611,7 +677,7 @@
   .employee-rows{display:flex;flex-direction:column;gap:14px;position:relative;z-index:1;}
   .employee-row{display:flex;align-items:center;gap:14px;}
   .employee-name{width:100px;flex-shrink:0;font-size:13px;font-weight:700;}
-  .employee-track{flex:1;height:16px;display:flex;background:var(--paper);border-radius:8px;overflow:hidden;border:1px solid var(--line);}
+  .employee-track{flex:1;height:16px;display:flex;background:var(--paper);border-radius:0;overflow:hidden;border:1px solid var(--line);}
   .employee-seg{height:100%;}
 
   /* x/y-axis chart scaffolding for the workload block */
@@ -675,18 +741,20 @@
   .cal-cell{
     min-height:78px;border:1px solid var(--line);border-radius:10px;background:var(--card);
     padding:6px;display:flex;flex-direction:column;gap:4px;
+    overflow:hidden;min-width:0;
   }
   .cal-cell.empty{background:transparent;border-color:transparent;}
   .cal-cell.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
   .cal-daynum{font-size:12px;font-weight:700;color:var(--muted);}
   .cal-cell.today .cal-daynum{color:var(--accent);}
   .cal-task-chip{
+    display:block;width:100%;max-width:100%;box-sizing:border-box;
     font-size:10px;font-weight:600;padding:2px 6px;border-radius:6px;
     background:var(--accent-soft);color:var(--accent);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  .cal-task-chip.chip-todo{background:var(--blue-soft);color:var(--blue);}
-  .cal-task-chip.chip-inprogress{background:var(--amber-soft);color:var(--amber);}
+  .cal-task-chip.chip-todo{background:var(--slate-soft);color:var(--slate);}
+  .cal-task-chip.chip-inprogress{background:var(--blue-soft);color:var(--blue);}
   .cal-task-chip.chip-completed{background:var(--accent-soft);color:var(--accent);}
   .cal-task-chip.overdue-chip {position:relative;background-color:#9e2c15;color: white;}  
   .cal-more{font-size:10px;color:var(--muted);font-weight:600;}
@@ -721,7 +789,7 @@
 
   /* automated progress bar states */
   .progress-fill.bar-completed{background:var(--accent);}
-  .progress-fill.bar-suspended{background:var(--red);}
+  .progress-fill.bar-suspended{background:var(--orange);}
   .progress-fill.bar-inprogress{background:var(--blue);}
 
   /* archived project read-only banner */
@@ -741,28 +809,28 @@
   .confirm-danger{background:var(--red);}
   .confirm-danger:hover{background:#93402e;}
 
-  /* task table: keep deadline & assignee on one line */
+  /* task table: keep deadline on one line; assignee wraps instead of clipping */
   .deadline-cell{white-space:nowrap;}
   .assignee-cell{
-    white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;
-    display:block;
+    white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.35;
   }
 
   /* task table: delete button replacing the old ⋮ menu */
   .delete-row-btn{
     width:28px;height:28px;border:none;background:none;cursor:pointer;
     color:var(--muted);font-size:14px;border-radius:6px;
+    display:inline-flex;align-items:center;justify-content:center;
   }
   .delete-row-btn:hover{background:var(--red-soft);color:var(--red);}
+  .trash-icon{vertical-align:-2px;}
 
-  /* task table: bulleted, timestamped remarks */
+  /* task table: plain, timestamped remarks (no bullet, aligned under header) */
   .remarks-cell{max-width:220px;}
-  .remarks-cell-list{list-style:disc;margin:0;padding-left:16px;}
+  .remarks-cell-list{list-style:none;margin:0;padding:0;}
   .remarks-cell-list li{
-    font-size:11.5px;color:var(--muted);line-height:1.5;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;
+    font-size:12px;color:var(--ink);line-height:1.5;font-weight:500;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;
   }
-  .remarks-cell-ts{font-weight:700;color:var(--ink);margin-right:4px;}
 
   /* modal: remarks log editor */
   .remarks-log{list-style:none;margin:0 0 6px;padding:0;max-height:150px;overflow-y:auto;}
@@ -809,9 +877,9 @@
   .gantt-nav{margin-bottom:0;gap:10px;}
   .gantt-month-label{font-size:13px;}
 
-  /* calendar: clickable chips / +more */
-  .cal-task-chip[data-open-task]{cursor:pointer;}
-  .cal-task-chip[data-open-task]:hover{filter:brightness(0.92);}
+  /* calendar: clickable chips / +more — both open the summarized day view */
+  .cal-task-chip[data-open-day]{cursor:pointer;}
+  .cal-task-chip[data-open-day]:hover{filter:brightness(0.92);}
   .cal-more{cursor:pointer;text-decoration:underline;}
   .cal-more:hover{color:var(--ink);}
 
