@@ -16,7 +16,9 @@
         <h1>Project Tracker</h1>
         <p class="subtitle">All active builds, in one place</p>
       </div>
-      <button class="settings-btn">⚙ Settings</button>
+      <div class="settings-wrap">
+        <button class="settings-btn" id="settings-btn">⚙ Settings</button>
+      </div>
     </header>
 
     <div class="action-row">
@@ -39,6 +41,7 @@
     <div class="detail-header">
       <div class="detail-header-left">
         <div class="detail-title" id="detail-title">Project Name</div>
+        <p class="detail-details" id="detail-details">Project description</p>
         <p class="detail-sub" id="detail-sub">Lead • Status</p>
       </div>
       <div class="detail-header-right">
@@ -48,7 +51,7 @@
         </div>
         <div class="detail-launch">
           <span class="detail-launch-value" id="detail-launch-value">—</span>
-          <span class="detail-meta-label">Launch date</span>
+          <span class="detail-meta-label">Deployment Date</span>
         </div>
       </div>
     </div>
@@ -81,7 +84,6 @@
           <button class="cal-nav-btn" id="cal-next">›</button>
         </div>
         <div class="cal-legend">
-          <span><span class="legend-swatch swatch-todo"></span>To Do</span>
           <span><span class="legend-swatch swatch-inprogress"></span>In Progress</span>
           <span><span class="legend-swatch swatch-completed"></span>Completed</span>
           <span><span class="legend-swatch swatch-overdue"></span>Overdue</span>
@@ -98,9 +100,6 @@
   <div class="modal">
     <div class="modal-top">
       <h3 class="modal-top-title" id="modal-title">New Task</h3>
-      <div class="modal-top-actions" id="modal-edit-delete" style="display:none;">
-        <button class="link-btn danger" id="delete-task-btn">🗑 Delete</button>
-      </div>
     </div>
 
     <div class="modal-body">
@@ -121,12 +120,7 @@
         <div class="field">
           <label>Category<span class="req">*</span></label>
           <select id="f-category">
-            <option value="planning">📋 Planning</option>
-            <option value="design">🎨 Design</option>
-            <option value="development">💻 Development</option>
-            <option value="testing">🧪 Testing</option>
-            <option value="deployment">🚀 Deployment</option>
-            <option value="maintenance">🔧 Maintenance</option>
+            <!-- options are generated from categoryMeta in script.js so the emoji here always matches the rest of the app -->
           </select>
         </div>
       </div>
@@ -162,8 +156,7 @@
         <div class="field">
           <label>Status</label>
           <select id="f-status">
-            <option value="todo" selected>To Do</option>
-            <option value="inprogress">In Progress</option>
+            <option value="inprogress" selected>In Progress</option>
             <option value="completed">Completed</option>
           </select>
         </div>
@@ -197,8 +190,10 @@
     </div>
 
     <div class="modal-footer">
-      <button class="btn btn-cancel" id="modal-cancel-btn">Cancel</button>
-      <button class="btn btn-submit" id="modal-submit-btn">Submit</button>
+      <div class="modal-footer-right">
+        <button class="btn btn-cancel" id="modal-cancel-btn">Cancel</button>
+        <button class="btn btn-submit" id="modal-submit-btn">Submit</button>
+      </div>
     </div>
   </div>
 </div>
@@ -209,7 +204,7 @@
       <h3 class="modal-top-title" id="pm-title">New Project</h3>
       <div class="modal-top-actions" id="pm-edit-actions" style="display:none;">
         <button class="link-btn" id="pm-archive-btn">🗄 Archive</button>
-        <button class="link-btn danger" id="pm-delete-btn">🗑 Delete</button>
+        <button class="link-btn danger" id="pm-delete-btn"><svg class="trash-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M10 11v6"/><path d="M14 11v6"/></svg> Delete</button>
       </div>
     </div>
 
@@ -230,7 +225,7 @@
           <input type="text" id="pm-lead" placeholder="Name">
         </div>
         <div class="field">
-          <label>Launch Date</label>
+          <label>Deployment Date</label>
           <input type="date" id="pm-launch">
         </div>
       </div>
