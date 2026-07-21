@@ -396,6 +396,12 @@
     vertical-align:middle;
     overflow:hidden;
   }
+  .task-table th:nth-child(3),
+  .task table td:nth-child(3) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
   .task-table td:first-child, .task-table td:nth-child(2){overflow:visible;vertical-align:top;}
   .task-table tbody tr{cursor:pointer;}
   .task-table tbody tr:hover{background:var(--paper);}
