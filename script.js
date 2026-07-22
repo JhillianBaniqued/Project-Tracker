@@ -832,13 +832,7 @@
         <table class="dash-table" data-table-id="${id}">
           <thead><tr>${headCells}</tr></thead>
           <tbody>${rows}</tbody>
-        </table>
-        <div class="pager">
-          <span class="pager-info">Page ${safePage} of ${totalPages}</span>
-          <button class="pager-btn" data-page-dir="-1" data-table="${id}" ${safePage<=1?'disabled':''}>‹</button>
-          <button class="pager-btn" data-page-dir="1" data-table="${id}" ${safePage>=totalPages?'disabled':''}>›</button>
-        </div>
-      </div>`;
+        </table>`;
   }
 
   function wireSortedTable(id, dataLen, onSort, onPage, sortState, page){
