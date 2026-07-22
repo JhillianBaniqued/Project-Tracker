@@ -190,10 +190,10 @@
     overflow:hidden;
     margin-top:10px;
   }
-  .progress-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 99px;
+  .progress-fill{
+    height:100%;
+    background:var(--accent);
+    border-radius:99px;
   }
 
   /* PROJECT DETAIL HEADER */
@@ -416,6 +416,12 @@
   .status-badge.status-inprogress{background:var(--blue-soft);color:var(--blue);}
   .status-badge.status-completed{background:var(--accent-soft);color:var(--accent);}
   .status-badge.status-todo{background:var(--slate-soft);color:var(--slate);}
+  .repeat-badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:700;padding:2px 6px;border-radius:999px;
+    background:var(--slate-soft);color:var(--slate);white-space:nowrap;margin-top:4px;
+    letter-spacing:0.2px;cursor:default;
+  }
   .remarks-cell{
     max-width:140px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -514,7 +520,7 @@
     margin-bottom:7px;
   }
   label .req{color:var(--red);margin-left:2px;}
-  input[type=text], input[type=date], select, textarea{
+  input[type=text], input[type=date], input[type=month], select, textarea{
     width:100%;
     padding:10px 12px;
     border:1px solid var(--line);
@@ -524,8 +530,13 @@
     color:var(--ink);
     background:#fff;
   }
-  input[type=text]:focus, input[type=date]:focus, select:focus, textarea:focus{
+  input[type=text]:focus, input[type=date]:focus, input[type=month]:focus, select:focus, textarea:focus{
     outline:none;border-color:var(--accent);
+  }
+  .field-hint{
+    margin:6px 2px 0;
+    font-size:11.5px;
+    color:var(--muted);
   }
   textarea{resize:vertical;min-height:64px;}
   input[type=range]:disabled{opacity:0.55;cursor:not-allowed;}
@@ -672,7 +683,7 @@
     background-image:repeating-linear-gradient(to right, #eceef1 0, #eceef1 1px, transparent 1px, transparent calc(100%/31));
   }
   .gantt-grid-bar{
-    grid-row:1;align-self:center;height:14px;border-radius:7px;
+    grid-row:1;align-self:center;height:14px;border-radius:0;
     box-shadow:0 1px 2px rgba(0,0,0,0.08);
   }
   .gantt-grid-invalid{
@@ -716,7 +727,8 @@
     padding:10px 10px;font-size:13px;border-bottom:1px solid #eceef1;
   }
   .dash-table tr:last-child td{border-bottom:none;}
-  .overdue-days{color:#9e2c15;font-weight:700;font-size:12px;}
+  .date-cell{white-space:nowrap;}
+  .overdue-days{color:#9e2c15;font-weight:700;font-size:12px;white-space:nowrap;}
   .progress-mini{
     display:inline-block;font-size:11.5px;font-weight:700;color:var(--accent);
     background:var(--accent-soft);padding:2px 8px;border-radius:999px;
@@ -816,7 +828,8 @@
   .confirm-danger:hover{background:#93402e;}
 
   /* task table: keep deadline and assignee on one line so a long name never grows the row height or shifts other columns out of vertical-center alignment */
-  .deadline-cell{white-space:nowrap;}
+  .deadline-cell{overflow:visible;vertical-align:top;padding-top:12px;}
+  .deadline-cell .deadline-date{white-space:nowrap;}
   .assignee-cell{
     vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;
   }
@@ -845,6 +858,8 @@
     padding:8px 0;border-bottom:1px solid #eceef1;font-size:13px;
   }
   .remarks-log-item:last-child{border-bottom:none;}
+  .remarks-log-item-past{opacity:0.5;}
+  .remarks-log-item-past .remarks-log-text{color:var(--muted);}
   .remarks-log-text{flex:1;}
   .remarks-log-ts{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap;flex-shrink:0;}
   .remarks-log-delete{

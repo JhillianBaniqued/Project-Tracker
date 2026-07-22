@@ -124,6 +124,9 @@
 
   // ---------- PROGRESS / STATUS HELPERS ----------
   const STATUS_LABELS = {todo:'To Do', inprogress:'In Progress', completed:'Completed'};
+  // Single-letter form of a repeat frequency, used for the compact table
+  // badge (↻ D / ↻ W / ↻ M) instead of spelling the whole word out.
+  const REPEAT_ABBR = {daily:" Daily", weekly:" Weekly", monthly:" Monthly"};
   // Shortens a multi-word name for the table's Assigned To column, e.g.
   // "Mia Britty" -> "Mia B." — keeps the first name in full and reduces
   // every following word to its initial. Single-word names pass through.
@@ -153,6 +156,18 @@
     if(t.status==='completed') return 'completed';
     if(t.status==='inprogress') return 'inprogress';
     return 'todo';
+  }
+  // Full "Repeats X until Y" text for tooltips — the table/calendar badges
+  // themselves stay compact, this is what shows up on hover.
+  function repeatTooltip(t){
+    if(!t.repeat || t.repeat==='none') return '';
+    const freqLabel = t.repeat.charAt(0).toUpperCase()+t.repeat.slice(1);
+    if(!t.repeatUntil) return `Repeats ${freqLabel}`;
+    if(t.repeat==='monthly' && /^\d{4}-\d{2}$/.test(t.repeatUntil)){
+      const [y,m] = t.repeatUntil.split('-').map(Number);
+      return `Repeats ${freqLabel} until ${MONTH_NAMES[m-1]} ${y}`;
+    }
+    return `Repeats ${freqLabel} until ${fmtDate(t.repeatUntil)}`;
   }
 
   // ---------- GENERIC CONFIRM MODAL ----------
@@ -432,8 +447,13 @@
         const status = t.status || 'todo';
         const progress = t.progress || 0;
         const remarksLog = ensureRemarksLog(t);
-        const remarksHtml = remarksLog.length
-          ? `<ul class="remarks-cell-list">${remarksLog.slice(-3).map(r=>`<li title="${fmtTimestamp(r.ts).replace(/"/g,'&quot;')}">${(r.text||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
+        // Only remarks from the CURRENT occurrence show in the table — once
+        // a recurring task rolls forward, older occurrences' remarks stay
+        // in the full log (visible, greyed out, in the task modal) but drop
+        // out of this compact preview.
+        const currentRemarks = remarksLog.slice(lastOccurrenceBoundary(remarksLog) + 1);
+        const remarksHtml = currentRemarks.length
+          ? `<ul class="remarks-cell-list">${currentRemarks.slice(-3).map(r=>`<li title="${fmtTimestamp(r.ts).replace(/"/g,'&quot;')}">${(r.text||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
           : '—';
         return `
         <tr data-task="${t.id}" data-cat="${cat}">
@@ -445,7 +465,7 @@
           </td>
           <td class="assignee-cell" title="${(t.assignee||'Unassigned').replace(/"/g,'&quot;')}">${t.assignee ? toInitials(t.assignee) : 'Unassigned'}</td>
           <td class="priority-${t.priority}" style="text-transform:capitalize;font-weight:700;">${t.priority}</td>
-          <td class="deadline-cell">${fmtDate(t.deadline)}</td>
+          <td class="deadline-cell"><div class="deadline-date">${fmtDate(t.deadline)}</div>${(t.repeat && t.repeat!=='none') ? `<span class="repeat-badge" title="${repeatTooltip(t)}">↻${REPEAT_ABBR[t.repeat]}</span>` : ''}</td>
           <td><span class="status-badge status-${status}">${STATUS_LABELS[status] || status}</span></td>
           <td class="remarks-cell">${remarksHtml}</td>
           <td>
@@ -606,12 +626,22 @@
     const daysInGanttMonth = new Date(ganttYear, ganttMonth+1, 0).getDate();
     const monthStart = new Date(ganttYear, ganttMonth, 1);
     const monthEnd = new Date(ganttYear, ganttMonth, daysInGanttMonth);
+    // Repeating tasks plot one bar per occurrence within the visible month
+    // (per their repeat + repeat-until settings) instead of a single
+    // continuous start->deadline span; non-repeating tasks keep the span bar.
     const ganttEntries = tasks.filter(t=>t.deadline).map(t=>{
+      if(t.repeat && t.repeat!=='none'){
+        const occDays = repeatOccurrencesInRange(t.repeatAnchor || t.deadline, t.repeat, monthStart, monthEnd, t.repeatUntil)
+          .map(dateStr => ({day: new Date(dateStr+'T00:00:00').getDate(), dateStr}));
+        if(!occDays.length) return null;
+        return {t, occDays, sortKey: new Date(ganttYear, ganttMonth, occDays[0].day)};
+      }
       const dlDate = new Date(t.deadline+'T00:00:00');
       const stDate = t.start ? new Date(t.start+'T00:00:00') : dlDate;
-      return {t, stDate: stDate <= dlDate ? stDate : dlDate, dlDate};
-    }).filter(({stDate,dlDate})=> dlDate >= monthStart && stDate <= monthEnd)
-      .sort((a,b)=> a.stDate - b.stDate);
+      const stD = stDate <= dlDate ? stDate : dlDate;
+      if(dlDate < monthStart || stD > monthEnd) return null;
+      return {t, stDate: stD, dlDate, sortKey: stD};
+    }).filter(Boolean).sort((a,b)=> a.sortKey - b.sortKey);
 
     const ganttTotalPages = Math.max(1, Math.ceil(ganttEntries.length / GANTT_PAGE_SIZE));
     const ganttSafePage = Math.min(ganttPage, ganttTotalPages);
@@ -630,16 +660,37 @@
       return `<div class="gantt-grid-head-cell${disabled?' disabled':''}">${disabled ? '' : day}</div>`;
     }).join('');
 
-    const ganttRows = ganttPageItems.length ? ganttPageItems.map(({t,stDate,dlDate})=>{
-      const startDay = stDate < monthStart ? 1 : stDate.getDate();
-      const endDay = dlDate > monthEnd ? daysInGanttMonth : dlDate.getDate();
+    const ganttRows = ganttPageItems.length ? ganttPageItems.map(entry=>{
+      const {t} = entry;
+      const safeName = t.name.replace(/"/g,'&quot;');
       const cls = isOverdue(t) ? 'swatch-overdue' : (t.status==='completed' ? 'swatch-completed' : 'swatch-inprogress');
+      let bars;
+      if(entry.occDays){
+        // One narrow bar per occurrence date, each labeled with its own date
+        // and the repeat frequency, so a recurring task's cadence is visible
+        // at a glance instead of one long unbroken span. Per-occurrence
+        // status/overdue rules mirror the calendar exactly: a date before
+        // the live deadline reads as Done, the live deadline date reflects
+        // the task's real status (and can be overdue), later dates read as
+        // In Progress.
+        const todayStr = `${today0.getFullYear()}-${String(today0.getMonth()+1).padStart(2,'0')}-${String(today0.getDate()).padStart(2,'0')}`;
+        bars = entry.occDays.map(({day, dateStr})=>{
+          const occStatus = occurrenceStatusForDate(t, dateStr);
+          const occOverdue = occStatus!=='completed' && dateStr===t.deadline && dateStr < todayStr;
+          const occCls = occOverdue ? 'swatch-overdue' : (occStatus==='completed' ? 'swatch-completed' : 'swatch-inprogress');
+          return `<div class="gantt-grid-bar ${occCls}" style="grid-column:${day} / ${day+1};" title="${safeName} — ${fmtDate(dateStr)} (${repeatTooltip(t).toLowerCase()})"></div>`;
+        }).join('');
+      } else {
+        const startDay = entry.stDate < monthStart ? 1 : entry.stDate.getDate();
+        const endDay = entry.dlDate > monthEnd ? daysInGanttMonth : entry.dlDate.getDate();
+        bars = `<div class="gantt-grid-bar ${cls}" style="grid-column:${startDay} / ${endDay+1};" title="${safeName} — ${fmtDate(t.deadline)}"></div>`;
+      }
       return `
         <div class="gantt-grid-row">
-          <div class="gantt-grid-taskname" title="${t.name.replace(/"/g,'&quot;')}">${t.name}</div>
+          <div class="gantt-grid-taskname" title="${safeName}">${t.name}${(t.repeat && t.repeat!=='none') ? ` <span class="repeat-badge" title="${repeatTooltip(t)}">↻${REPEAT_ABBR[t.repeat]}</span>` : ''}</div>
           <div class="gantt-grid-track" style="grid-template-columns:${ganttTrackTemplate};">
             <div class="gantt-grid-invalid" style="grid-column:${daysInGanttMonth+1} / ${GANTT_COLS+1};"></div>
-            <div class="gantt-grid-bar ${cls}" style="grid-column:${startDay} / ${endDay+1};" title="${t.name.replace(/"/g,'&quot;')} — ${fmtDate(t.deadline)}"></div>
+            ${bars}
           </div>
         </div>`;
     }).join('') : `<div class="empty-note">No tasks with deadlines in ${MONTH_NAMES[ganttMonth]} ${ganttYear}.</div>`;
@@ -758,7 +809,7 @@
         {key:'assignee', label:'Assigned to'},
         {key:'daysOverdue', label:'Days'}
       ],
-      renderRow: o=>`<tr><td>${o.task}</td><td>${o.deadlineLabel}</td><td>${o.assignee}</td><td class="overdue-days">${o.daysOverdue} day${o.daysOverdue===1?'':'s'} overdue</td></tr>`,
+      renderRow: o=>`<tr><td>${o.task}</td><td class="date-cell">${o.deadlineLabel}</td><td>${o.assignee}</td><td class="overdue-days">${o.daysOverdue} day${o.daysOverdue===1?'':'s'} overdue</td></tr>`,
       emptyMsg:'Nothing overdue — nice.',
       id:'overdue'
     });
@@ -783,7 +834,7 @@
         {key:'employee', label:'Employee'},
         {key:'progress', label:'Progress'}
       ],
-      renderRow: u=>`<tr><td>${u.task}</td><td>${u.deadlineLabel}</td><td>${u.employee}</td><td><span class="progress-mini">${u.progress}%</span></td></tr>`,
+      renderRow: u=>`<tr><td>${u.task}</td><td class="date-cell">${u.deadlineLabel}</td><td>${u.employee}</td><td><span class="progress-mini">${u.progress}%</span></td></tr>`,
       emptyMsg:'No upcoming deadlines.',
       id:'upcoming'
     });
@@ -868,16 +919,132 @@
   const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DOW_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+  // Formats a Date object back to a plain 'YYYY-MM-DD' string.
+  function toISODate(d){
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  // Given a task's deadline (the anchor date) and its repeat frequency,
+  // returns every occurrence date (as 'YYYY-MM-DD' strings) that falls
+  // within [rangeStart, rangeEnd] — used to plot recurring tasks across
+  // every calendar month they touch, not just their original deadline.
+  // The effective date a repeat series stops at: an explicit "repeat
+  // until" picked by the user takes priority (monthly stores it as
+  // 'YYYY-MM' from the month picker and runs through the LAST day of that
+  // month; daily/weekly store a plain 'YYYY-MM-DD'). With no end date set,
+  // falls back to a fixed horizon so a recurring task doesn't keep
+  // projecting/rolling forever.
+  function repeatEndLimit(anchorStr, freq, untilStr){
+    let limit = null;
+    if(untilStr){
+      if(freq==='monthly' && /^\d{4}-\d{2}$/.test(untilStr)){
+        const [y,m] = untilStr.split('-').map(Number);
+        limit = new Date(y, m, 0);
+      } else {
+        limit = new Date(untilStr+'T00:00:00');
+      }
+      if(isNaN(limit)) limit = null;
+    }
+    if(!limit && anchorStr){
+      const anchor = new Date(anchorStr+'T00:00:00');
+      limit = new Date(anchor);
+      if(freq==='daily') limit.setDate(limit.getDate()+30);
+      else if(freq==='weekly') limit.setDate(limit.getDate()+12*7);
+      else if(freq==='monthly') limit.setMonth(limit.getMonth()+4);
+    }
+    return limit;
+  }
+  // Adds a single step (1 day / 1 week / 1 month, per freq) to a
+  // 'YYYY-MM-DD' date string and returns the result in the same format.
+  function advanceByRepeat(dateStr, freq){
+    if(!dateStr) return dateStr;
+    const d = new Date(dateStr+'T00:00:00');
+    if(isNaN(d)) return dateStr;
+    if(freq==='daily') d.setDate(d.getDate()+1);
+    else if(freq==='weekly') d.setDate(d.getDate()+7);
+    else if(freq==='monthly') d.setMonth(d.getMonth()+1);
+    return toISODate(d);
+  }
+  // Whether a candidate next-occurrence date still falls within the
+  // series' explicit "repeat until" — used to decide whether completing a
+  // recurring task should roll forward to another occurrence or stop for
+  // good. Requires an explicit repeatUntil (no fallback horizon here) so a
+  // task without one simply completes normally instead of rolling forever.
+  function isWithinRepeatUntil(dateStr, freq, untilStr){
+    if(!untilStr) return false;
+    const limit = repeatEndLimit(null, freq, untilStr);
+    if(!limit) return false;
+    const d = new Date(dateStr+'T00:00:00');
+    return d <= limit;
+  }
+  // Finds the index of the most recent "occurrence complete" marker in a
+  // remarks log — everything at or before it belongs to a past occurrence
+  // of a recurring task; everything after belongs to the current one.
+  function lastOccurrenceBoundary(remarksArr){
+    for(let i=(remarksArr||[]).length-1; i>=0; i--){
+      if(remarksArr[i] && remarksArr[i].occurrenceBoundary) return i;
+    }
+    return -1;
+  }
+  function repeatOccurrencesInRange(anchorStr, freq, rangeStart, rangeEnd, untilStr){
+    if(!anchorStr || !freq || freq==='none') return [];
+    const anchor = new Date(anchorStr+'T00:00:00');
+    if(isNaN(anchor)) return [];
+    if(anchor > rangeEnd) return []; // repeats only ever move forward from the deadline
+
+    const limit = repeatEndLimit(anchorStr, freq, untilStr);
+    const effectiveEnd = limit < rangeEnd ? limit : rangeEnd;
+    if(anchor > effectiveEnd) return [];
+
+    function step(d){
+      const nd = new Date(d);
+      if(freq==='daily') nd.setDate(nd.getDate()+1);
+      else if(freq==='weekly') nd.setDate(nd.getDate()+7);
+      else if(freq==='monthly') nd.setMonth(nd.getMonth()+1);
+      return nd;
+    }
+    let d = new Date(anchor), guard = 0;
+    while(d < rangeStart && guard < 2000){ d = step(d); guard++; }
+    const out = [];
+    while(d <= effectiveEnd && guard < 4000){
+      out.push(toISODate(d));
+      d = step(d);
+      guard++;
+    }
+    return out;
+  }
+
+  // Per-occurrence status for a projected calendar date: a date before the
+  // task's current (live) deadline reads as Done — that cycle has already
+  // passed — the date matching the current deadline reflects the task's
+  // real status, and any later projected date is just shown as In Progress
+  // (there's no separate "Upcoming" bucket).
+  function occurrenceStatusForDate(t, dateStr){
+    if(!t.repeat || t.repeat==='none' || !t.deadline) return t.status;
+    if(dateStr < t.deadline) return 'completed';
+    if(dateStr === t.deadline) return t.status;
+    return 'inprogress';
+  }
+
   function renderCalendar(){
     if(!currentProjectId) return;
     const p = projects.find(x=>x.id===currentProjectId);
     const tasks = allTasks(p).filter(t=>t.deadline);
 
-    // map deadline -> tasks due that day
+    const monthStart = new Date(calYear, calMonth, 1);
+    const monthEnd = new Date(calYear, calMonth+1, 0);
+
+    // map deadline -> tasks due that day (repeating tasks get plotted on
+    // every occurrence that falls in the visible month, not just their
+    // original deadline)
     const byDate = {};
     tasks.forEach(t=>{
-      byDate[t.deadline] = byDate[t.deadline] || [];
-      byDate[t.deadline].push(t);
+      const dates = (t.repeat && t.repeat!=='none')
+        ? repeatOccurrencesInRange(t.repeatAnchor || t.deadline, t.repeat, monthStart, monthEnd, t.repeatUntil)
+        : [t.deadline];
+      dates.forEach(dateStr=>{
+        byDate[dateStr] = byDate[dateStr] || [];
+        byDate[dateStr].push({task:t, occStatus: occurrenceStatusForDate(t, dateStr)});
+      });
     });
 
     document.getElementById('cal-month-label').textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
@@ -892,10 +1059,17 @@
       const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
       const dayTasks = byDate[dateStr] || [];
       const isToday = dateStr===todayStr;
-      const chips = dayTasks.slice(0,2).map(t=>{
-        const overdue = isOverdue(t);
-        const statusClass = t.status==='completed' ? 'chip-completed' : (t.status==='inprogress' ? 'chip-inprogress' : 'chip-todo');
-        return `<span class="cal-task-chip ${statusClass} ${overdue?'overdue-chip':''}" title="${t.name.replace(/"/g,'&quot;')}" data-open-day="${dateStr}">${t.name}</span>`;
+      const chips = dayTasks.slice(0,2).map(entry=>{
+        const t = entry.task;
+        const occStatus = entry.occStatus;
+        // Overdue only applies to the task's real, live deadline date —
+        // past projected occurrences read as Done, future ones as In
+        // Progress, so neither of those can be "overdue".
+        const overdue = occStatus!=='completed' && dateStr===t.deadline && dateStr < todayStr;
+        const statusClass = occStatus==='completed' ? 'chip-completed' : 'chip-inprogress';
+        const repeatMark = (t.repeat && t.repeat!=='none') ? ' ↻' : '';
+        const titleText = t.name.replace(/"/g,'&quot;') + (repeatMark ? ' ('+repeatTooltip(t).toLowerCase()+')' : '');
+        return `<span class="cal-task-chip ${statusClass} ${overdue?'overdue-chip':''}" title="${titleText}" data-open-day="${dateStr}">${t.name}${repeatMark}</span>`;
       }).join('');
       const more = dayTasks.length>2 ? `<span class="cal-more" data-open-day="${dateStr}">+${dayTasks.length-2} more</span>` : '';
       cells += `<div class="cal-cell ${isToday?'today':''}"><span class="cal-daynum">${day}</span>${chips}${more}</div>`;
@@ -914,14 +1088,19 @@
     const p = projects.find(x=>x.id===currentProjectId);
     const d = new Date(dateStr+'T00:00:00');
     document.getElementById('day-modal-title').textContent = isNaN(d) ? 'Tasks' : d.toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'});
-    document.getElementById('day-modal-body').innerHTML = dayTasks.length ? dayTasks.map(t=>{
-      const overdue = isOverdue(t);
-      const statusClass = t.status==='completed' ? 'chip-completed' : (t.status==='inprogress' ? 'chip-inprogress' : 'chip-todo');
+    const todayStr = `${today0.getFullYear()}-${String(today0.getMonth()+1).padStart(2,'0')}-${String(today0.getDate()).padStart(2,'0')}`;
+    document.getElementById('day-modal-body').innerHTML = dayTasks.length ? dayTasks.map(entry=>{
+      const t = entry.task;
+      const occStatus = entry.occStatus;
+      const overdue = occStatus!=='completed' && dateStr===t.deadline && dateStr < todayStr;
+      const statusClass = occStatus==='completed' ? 'chip-completed' : 'chip-inprogress';
+      const occLabel = occStatus==='completed' ? 'Completed' : 'In Progress';
       const cat = categoryMeta[t.category];
+      const repeatMark = (t.repeat && t.repeat!=='none') ? ` <span class="day-modal-row-cat" title="${repeatTooltip(t)}">↻ ${t.repeat}</span>` : '';
       return `
       <div class="day-modal-row" data-open-task="${t.id}">
         <span class="cal-task-chip ${statusClass} ${overdue?'overdue-chip':''}" style="white-space:normal;">${t.name}</span>
-        <span class="day-modal-row-meta">${cat ? `<span class="day-modal-row-cat" title="${cat.label}">${cat.emoji} ${cat.label}</span> · ` : ''}${t.assignee || 'Unassigned'} · ${STATUS_LABELS[t.status]||t.status}</span>
+        <span class="day-modal-row-meta">${cat ? `<span class="day-modal-row-cat" title="${cat.label}">${cat.emoji} ${cat.label}</span> · ` : ''}${t.assignee || 'Unassigned'} · ${occLabel}${repeatMark}</span>
       </div>`;
     }).join('') : `<div class="empty-note">No tasks.</div>`;
     document.querySelectorAll('#day-modal-body [data-open-task]').forEach(el=>{
@@ -1000,6 +1179,8 @@
       document.getElementById('f-start').value = t.start || '';
       document.getElementById('f-deadline').value = t.deadline || '';
       document.getElementById('f-repeat').value = t.repeat || 'none';
+      updateRepeatUntilField();
+      document.getElementById('f-repeat-until').value = t.repeatUntil || '';
       // The modal only offers In Progress / Completed now — a legacy "To Do"
       // task opens as In Progress here; saving will carry that forward.
       document.getElementById('f-status').value = t.status === 'completed' ? 'completed' : 'inprogress';
@@ -1014,6 +1195,7 @@
       document.getElementById('f-start').value = '';
       document.getElementById('f-deadline').value = '';
       document.getElementById('f-repeat').value = 'none';
+      updateRepeatUntilField();
       document.getElementById('f-status').value = 'inprogress';
       document.getElementById('f-progress-val').textContent = 0;
       remarksDraft = [];
@@ -1031,6 +1213,51 @@
     el.classList.toggle('status-select-inprogress', el.value === 'inprogress');
     el.classList.toggle('status-select-completed', el.value === 'completed');
   }
+
+  // Shows/hides and reconfigures the "Repeat Until" picker to match the
+  // chosen frequency: a day-level calendar for Daily/Weekly (so the person
+  // can pick the exact last occurrence, or the week to stop at), and a
+  // month picker for Monthly (so the choice is a month, not a specific day).
+  function updateRepeatUntilField(){
+    const freq = document.getElementById('f-repeat').value;
+    const wrap = document.getElementById('repeat-until-wrap');
+    const label = document.getElementById('repeat-until-label');
+    const hint = document.getElementById('repeat-until-hint');
+    const input = document.getElementById('f-repeat-until');
+
+    if(!freq || freq==='none'){
+      wrap.style.display = 'none';
+      input.value = '';
+      return;
+    }
+    wrap.style.display = 'block';
+
+    const wantType = freq === 'monthly' ? 'month' : 'date';
+    if(input.type !== wantType){
+      input.type = wantType;
+      input.value = '';
+    }
+
+    if(freq === 'daily'){
+      label.textContent = 'Repeat Until';
+      hint.textContent = 'Last day this daily task repeats.';
+    } else if(freq === 'weekly'){
+      label.textContent = 'Repeat Until (Week Of)';
+      hint.textContent = 'Pick any day in the last week it should repeat.';
+    } else {
+      label.textContent = 'Repeat Until (Month)';
+      hint.textContent = 'Last month this task repeats in.';
+    }
+
+    if(wantType === 'date'){
+      const deadlineVal = document.getElementById('f-deadline').value;
+      if(deadlineVal) input.min = deadlineVal; else input.removeAttribute('min');
+    } else {
+      input.removeAttribute('min');
+    }
+  }
+  document.getElementById('f-repeat').addEventListener('change', updateRepeatUntilField);
+  document.getElementById('f-deadline').addEventListener('change', updateRepeatUntilField);
 
   // Live title-case: capitalizes as the person types, without touching the
   // rest of what they've typed (so "iPhone" or "McKay" stay intact).
@@ -1157,13 +1384,16 @@
     const list = document.getElementById('remarks-log');
     const empty = document.getElementById('remarks-empty');
     empty.style.display = remarksDraft.length ? 'none' : 'block';
-    list.innerHTML = remarksDraft.map((r,idx)=>`
-      <li class="remarks-log-item">
+    const boundaryIdx = lastOccurrenceBoundary(remarksDraft);
+    list.innerHTML = remarksDraft.map((r,idx)=>{
+      const isPast = boundaryIdx >= 0 && idx <= boundaryIdx;
+      return `
+      <li class="remarks-log-item${isPast ? ' remarks-log-item-past' : ''}">
         <span class="remarks-log-text">${(r.text||'').replace(/</g,'&lt;')}</span>
         <span class="remarks-log-ts">${fmtTimestamp(r.ts)}</span>
-        ${readOnly ? '' : `<button type="button" class="remarks-log-delete" data-remark-idx="${idx}" title="Delete remark">✕</button>`}
+        ${(readOnly || isPast) ? '' : `<button type="button" class="remarks-log-delete" data-remark-idx="${idx}" title="Delete remark">✕</button>`}
       </li>
-    `).join('');
+    `;}).join('');
     const addRow = document.getElementById('f-remarks-new').closest('.remarks-add-row');
     if(addRow) addRow.style.display = readOnly ? 'none' : 'flex';
     list.querySelectorAll('.remarks-log-delete').forEach(btn=>{
@@ -1212,7 +1442,7 @@
 
     const p = projects.find(x=>x.id===currentProjectId);
     const category = document.getElementById('f-category').value;
-    const finalSubtasks = subtaskDraft.filter(s=>s.name.trim()!=='');
+    let finalSubtasks = subtaskDraft.filter(s=>s.name.trim()!=='');
     const derivedProgress = subtaskProgressPct(finalSubtasks);
     let status = document.getElementById('f-status').value;
     let progress;
@@ -1225,14 +1455,65 @@
       // No subtasks: progress is fixed to whatever status was picked.
       progress = status === 'completed' ? 100 : 0;
     }
+
+    let start = document.getElementById('f-start').value;
+    let deadline = document.getElementById('f-deadline').value;
+    const repeatVal = document.getElementById('f-repeat').value;
+    const repeatUntilVal = repeatVal !== 'none' ? document.getElementById('f-repeat-until').value : '';
+    let finalRemarksLog = remarksDraft.slice();
+
+    // repeatAnchor is the ORIGINAL deadline the series started from, and it
+    // never moves once rollovers begin advancing the live deadline forward
+    // — the calendar/gantt project every occurrence from this fixed point
+    // so completed past occurrences keep showing (as Done) instead of
+    // disappearing once the task rolls to its next one. Only reset it when
+    // the repeat is newly turned on or the frequency changes.
+    const existingForRepeat = (editingTask && editingTask.taskId)
+      ? (p.tasks[editingTask.category] || []).find(t=>t.id===editingTask.taskId)
+      : null;
+    let repeatAnchor = '';
+    if(repeatVal !== 'none'){
+      repeatAnchor = (existingForRepeat && existingForRepeat.repeat === repeatVal && existingForRepeat.repeatAnchor)
+        ? existingForRepeat.repeatAnchor
+        : deadline;
+    }
+
+    if(repeatVal !== 'none' && status === 'completed' && deadline){
+      const nextDeadline = advanceByRepeat(deadline, repeatVal);
+      const seriesContinues = isWithinRepeatUntil(nextDeadline, repeatVal, repeatUntilVal);
+      // Recurring task: completing an occurrence logs it. If the series
+      // still has occurrences left (per Repeat Until), roll both the start
+      // date and deadline forward to the next one instead of leaving the
+      // task sitting at Completed — the schedule keeps moving forward from
+      // the original due date. Once Repeat Until is reached, the series
+      // simply ends and this last occurrence stays Completed.
+      finalRemarksLog = finalRemarksLog.concat([{
+        text: seriesContinues
+          ? `✓ Completed occurrence due ${fmtDate(deadline)}`
+          : `✓ Completed final occurrence due ${fmtDate(deadline)}`,
+        ts: new Date().toISOString(),
+        occurrenceBoundary: true
+      }]);
+      if(seriesContinues){
+        if(start) start = advanceByRepeat(start, repeatVal);
+        deadline = nextDeadline;
+        status = 'inprogress';
+        finalSubtasks = finalSubtasks.map(s => Object.assign({}, s, {completed:false}));
+        const resetProgress = subtaskProgressPct(finalSubtasks);
+        progress = resetProgress !== null ? resetProgress : 0;
+      }
+    }
+
     const payload = {
       name,
       priority: document.getElementById('f-priority').value,
       assignee: document.getElementById('f-assignee').value.trim(),
-      start: document.getElementById('f-start').value,
-      deadline: document.getElementById('f-deadline').value,
-      repeat: document.getElementById('f-repeat').value,
-      remarksLog: remarksDraft.slice(),
+      start,
+      deadline,
+      repeat: repeatVal,
+      repeatUntil: repeatUntilVal,
+      repeatAnchor,
+      remarksLog: finalRemarksLog,
       status,
       progress,
       subtasks: finalSubtasks
