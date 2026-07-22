@@ -1100,7 +1100,6 @@
       // one is checked off. Reaching 100% flips status to completed on its own;
       // unchecking one after that pulls it back to In Progress.
       value = computed;
-      note.textContent = '(auto from subtasks)';
       if(computed === 100){
         statusField.value = 'completed';
       } else if(statusField.value === 'completed'){
@@ -1110,7 +1109,6 @@
       // No subtasks: progress is fixed to the status — 0% for To Do / In
       // Progress, 100% for completed. It never moves on its own otherwise.
       value = statusField.value === 'completed' ? 100 : 0;
-      note.textContent = '(auto from status)';
     }
     field.value = value;
     label.textContent = value;
