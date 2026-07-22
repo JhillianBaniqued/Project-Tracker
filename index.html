@@ -105,7 +105,7 @@
     <div class="modal-body">
       <div class="field">
         <label>Task Name<span class="req">*</span></label>
-        <input type="text" id="f-name" placeholder="e.g. Draft wireframes">
+        <input type="text" id="f-name" placeholder="e.g. Draft wireframes" autocomplete="off">
       </div>
 
       <div class="field-row">
@@ -129,7 +129,7 @@
 
       <div class="field">
         <label>Assigned To</label>
-        <input type="text" id="f-assignee" placeholder="Name">
+        <input type="text" id="f-assignee" placeholder="Name" autocomplete="off">
       </div>
 
       <div class="field-row">
@@ -161,8 +161,7 @@
           </select>
         </div>
         <div class="field">
-          <label>Progress (<span id="f-progress-val">0</span>%) <span id="f-progress-note" style="font-weight:600;color:var(--muted);text-transform:none;font-size:11px;"></span></label>
-          <input type="range" id="f-progress" min="0" max="100" step="5" value="0">
+          <label>Progress (<span id="f-progress-val">0</span>%)</label>
           <div class="progress-track" style="margin-top:8px;"><div class="progress-fill" id="f-progress-bar-fill" style="width:0%"></div></div>
         </div>
       </div>
@@ -183,7 +182,7 @@
         <ul class="remarks-log" id="remarks-log"></ul>
         <div class="empty-note" id="remarks-empty">No remarks yet</div>
         <div class="remarks-add-row">
-          <input type="text" id="f-remarks-new" placeholder="Add a remark...">
+          <input type="text" id="f-remarks-new" placeholder="Add a remark..." autocomplete="off">
           <button class="btn btn-outline" id="add-remark-btn" type="button">+ Add</button>
         </div>
       </div>
@@ -211,7 +210,7 @@
     <div class="modal-body">
       <div class="field">
         <label>Project Name<span class="req">*</span></label>
-        <input type="text" id="pm-name" placeholder="e.g. Website Redesign">
+        <input type="text" id="pm-name" placeholder="e.g. Website Redesign" autocomplete="off">
       </div>
 
       <div class="field">
@@ -222,7 +221,7 @@
       <div class="field-row">
         <div class="field">
           <label>Lead</label>
-          <input type="text" id="pm-lead" placeholder="Name">
+          <input type="text" id="pm-lead" placeholder="Name" autocomplete="off">
         </div>
         <div class="field">
           <label>Deployment Date</label>

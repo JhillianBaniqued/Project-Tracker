@@ -666,7 +666,13 @@
             <div class="gantt-grid-track-head" style="grid-template-columns:${ganttTrackTemplate};">${ganttHead}</div>
           </div>
           <div class="gantt-grid-rows">${ganttRows}</div>
-        </div>`;
+        </div>
+        <div class="pager">
+          <span class="pager-info">Page ${ganttSafePage} of ${ganttTotalPages}</span>
+          <button class="pager-btn" data-gantt-page-dir="-1" ${ganttSafePage<=1?'disabled':''}>‹</button>
+          <button class="pager-btn" data-gantt-page-dir="1" ${ganttSafePage>=ganttTotalPages?'disabled':''}>›</button>
+        </div>
+      </div>`;
 
     // workload by employee — partitioned into In Progress / Overdue / Completed.
     // Names are normalized (trimmed, single-spaced, first letter of each word
@@ -752,7 +758,7 @@
         {key:'assignee', label:'Assigned to'},
         {key:'daysOverdue', label:'Days'}
       ],
-      renderRow: o=>`<tr><td>${o.task}</td><td>${o.deadlineLabel}</td><td>${o.assignee}</td><td class="overdue-days">${o.daysOverdue} days overdue</td></tr>`,
+      renderRow: o=>`<tr><td>${o.task}</td><td>${o.deadlineLabel}</td><td>${o.assignee}</td><td class="overdue-days">${o.daysOverdue} day${o.daysOverdue===1?'':'s'} overdue</td></tr>`,
       emptyMsg:'Nothing overdue — nice.',
       id:'overdue'
     });
@@ -832,7 +838,13 @@
         <table class="dash-table" data-table-id="${id}">
           <thead><tr>${headCells}</tr></thead>
           <tbody>${rows}</tbody>
-        </table>`;
+        </table>
+        <div class="pager">
+          <span class="pager-info">Page ${safePage} of ${totalPages}</span>
+          <button class="pager-btn" data-page-dir="-1" data-table="${id}" ${safePage<=1?'disabled':''}>‹</button>
+          <button class="pager-btn" data-page-dir="1" data-table="${id}" ${safePage>=totalPages?'disabled':''}>›</button>
+        </div>
+      </div>`;
   }
 
   function wireSortedTable(id, dataLen, onSort, onPage, sortState, page){
@@ -991,7 +1003,6 @@
       // The modal only offers In Progress / Completed now — a legacy "To Do"
       // task opens as In Progress here; saving will carry that forward.
       document.getElementById('f-status').value = t.status === 'completed' ? 'completed' : 'inprogress';
-      document.getElementById('f-progress').value = t.progress || 0;
       document.getElementById('f-progress-val').textContent = t.progress || 0;
       subtaskDraft = (t.subtasks || []).slice();
       remarksDraft = ensureRemarksLog(t).slice();
@@ -1004,7 +1015,6 @@
       document.getElementById('f-deadline').value = '';
       document.getElementById('f-repeat').value = 'none';
       document.getElementById('f-status').value = 'inprogress';
-      document.getElementById('f-progress').value = 0;
       document.getElementById('f-progress-val').textContent = 0;
       remarksDraft = [];
     }
@@ -1022,14 +1032,17 @@
     el.classList.toggle('status-select-completed', el.value === 'completed');
   }
 
-  // Live title-case: capitalizes the first letter after the start of the
-  // field and after every space as the person types, without touching the
-  // rest of what they've typed (so "iPhone" or "McKay" stay intact). Used
-  // on the task name (so it's uppercased for every first and space) and on
-  // the assignee field (so "john"/"John" collapse into one workload entry
-  // instead of showing up as two separate people).
+  // Live title-case: capitalizes as the person types, without touching the
+  // rest of what they've typed (so "iPhone" or "McKay" stay intact).
+  // "Assigned To" capitalizes the first letter of every word (so "john
+  // smith"/"John Smith" collapse into one workload entry instead of showing
+  // up as two separate people). Every other text field (task name, subtask,
+  // remarks) only capitalizes the very first letter of the whole entry.
   function capitalizeWords(str){
     return str.replace(/(^|\s)([a-z])/g, (m, boundary, letter) => boundary + letter.toUpperCase());
+  }
+  function capitalizeFirstOnly(str){
+    return str.replace(/^(\s*)([a-z])/, (m, leading, letter) => leading + letter.toUpperCase());
   }
   // Names only: letters (incl. accented), digits, spaces, hyphens and
   // apostrophes — so things like "Team 2" or "Anna-Marie" are allowed.
@@ -1040,13 +1053,13 @@
       .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9 '-]/g, '')
       .replace(/^[\s'-]+/, '');
   }
-  function wireLiveTitleCase(id, { nameOnly } = {}){
+  function wireLiveTitleCase(id, { nameOnly, everyWord } = {}){
     const el = document.getElementById(id);
     el.addEventListener('input', ()=>{
       const pos = el.selectionStart;
       const lenBefore = el.value.length;
       let next = nameOnly ? sanitizeName(el.value) : el.value;
-      next = capitalizeWords(next);
+      next = everyWord ? capitalizeWords(next) : capitalizeFirstOnly(next);
       if(next !== el.value){
         const removed = lenBefore - next.length;
         el.value = next;
@@ -1056,12 +1069,8 @@
     });
   }
   wireLiveTitleCase('f-name');
-  wireLiveTitleCase('f-assignee', { nameOnly: true });
-
-  document.getElementById('f-progress').addEventListener('input', (e)=>{
-    document.getElementById('f-progress-val').textContent = e.target.value;
-    document.getElementById('f-progress-bar-fill').style.width = e.target.value + '%';
-  });
+  wireLiveTitleCase('f-assignee', { nameOnly: true, everyWord: true });
+  wireLiveTitleCase('f-remarks-new');
 
   function closeTaskModal(){
     overlay.classList.remove('active');
@@ -1076,9 +1085,7 @@
 
   // subtasks
   function syncProgressFromSubtasks(){
-    const field = document.getElementById('f-progress');
     const label = document.getElementById('f-progress-val');
-    const note = document.getElementById('f-progress-note');
     const fill = document.getElementById('f-progress-bar-fill');
     const statusField = document.getElementById('f-status');
     const computed = subtaskProgressPct(subtaskDraft);
@@ -1098,9 +1105,7 @@
       // Progress, 100% for completed. It never moves on its own otherwise.
       value = statusField.value === 'completed' ? 100 : 0;
     }
-    field.value = value;
     label.textContent = value;
-    field.disabled = true;
     fill.style.width = value + '%';
     updateStatusFieldColor();
   }
@@ -1112,7 +1117,7 @@
     list.innerHTML = subtaskDraft.map((s, idx)=>`
       <div class="subtask-row">
         <input type="checkbox" ${s.completed?'checked':''} data-idx="${idx}" class="sub-check">
-        <input type="text" value="${s.name}" data-idx="${idx}" class="sub-name">
+        <input type="text" value="${s.name}" data-idx="${idx}" class="sub-name" autocomplete="off">
         <span class="remove-x" data-idx="${idx}">✕</span>
       </div>
     `).join('');
@@ -1124,7 +1129,17 @@
       });
     });
     list.querySelectorAll('.sub-name').forEach(inp=>{
-      inp.addEventListener('input', ()=>{ subtaskDraft[inp.dataset.idx].name = inp.value; });
+      inp.addEventListener('input', ()=>{
+        const pos = inp.selectionStart;
+        const lenBefore = inp.value.length;
+        const next = capitalizeFirstOnly(inp.value);
+        if(next !== inp.value){
+          const removed = lenBefore - next.length;
+          inp.value = next;
+          inp.selectionStart = inp.selectionEnd = Math.max(0, pos - removed);
+        }
+        subtaskDraft[inp.dataset.idx].name = inp.value;
+      });
     });
     list.querySelectorAll('.remove-x').forEach(x=>{
       x.addEventListener('click', ()=>{

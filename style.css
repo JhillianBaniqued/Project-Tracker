@@ -190,10 +190,10 @@
     overflow:hidden;
     margin-top:10px;
   }
-  .progress-fill{
-    height:100%;
-    background:var(--accent);
-    border-radius:99px;
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 99px;
   }
 
   /* PROJECT DETAIL HEADER */
@@ -401,8 +401,8 @@
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
-  }
-  .task-table td:first-child, .task-table td:nth-child(2){overflow:visible;vertical-align:top;}
+}
+  .task-table td:first-child{overflow:visible;vertical-align:top;}
   .task-table tbody tr{cursor:pointer;}
   .task-table tbody tr:hover{background:var(--paper);}
   .task-table tbody tr:last-child td{border-bottom:none;}
@@ -815,10 +815,10 @@
   .confirm-danger{background:var(--red);}
   .confirm-danger:hover{background:#93402e;}
 
-  /* task table: keep deadline on one line; assignee wraps instead of clipping */
+  /* task table: keep deadline and assignee on one line so a long name never grows the row height or shifts other columns out of vertical-center alignment */
   .deadline-cell{white-space:nowrap;}
   .assignee-cell{
-    white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.35;
+    vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;
   }
 
   /* task table: delete button replacing the old ⋮ menu */
