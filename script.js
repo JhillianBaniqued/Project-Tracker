@@ -666,13 +666,7 @@
             <div class="gantt-grid-track-head" style="grid-template-columns:${ganttTrackTemplate};">${ganttHead}</div>
           </div>
           <div class="gantt-grid-rows">${ganttRows}</div>
-        </div>
-        <div class="pager">
-          <span class="pager-info">Page ${ganttSafePage} of ${ganttTotalPages}</span>
-          <button class="pager-btn" data-gantt-page-dir="-1" ${ganttSafePage<=1?'disabled':''}>‹</button>
-          <button class="pager-btn" data-gantt-page-dir="1" ${ganttSafePage>=ganttTotalPages?'disabled':''}>›</button>
-        </div>
-      </div>`;
+        </div>`;
 
     // workload by employee — partitioned into In Progress / Overdue / Completed.
     // Names are normalized (trimmed, single-spaced, first letter of each word
